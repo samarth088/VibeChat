@@ -1,24 +1,20 @@
-// =============================
 // Global App State
-// =============================
 
-const State = {
+export const State = {
+  user: JSON.parse(localStorage.getItem("user")) || null,
+  activeUser: null,
+  activeChatId: null,
+  messageMap: {},
+};
 
-  currentUser: JSON.parse(localStorage.getItem("user")) || null,
+// Save user to localStorage
+export function setUser(user) {
+  State.user = user;
+  localStorage.setItem("user", JSON.stringify(user));
+}
 
-    activeChatId: null,
-
-      activeUserId: null,
-
-        setUser(user) {
-            this.currentUser = user;
-                localStorage.setItem("user", JSON.stringify(user));
-                  },
-
-                    logout() {
-                        localStorage.removeItem("user");
-                            this.currentUser = null;
-                                window.location.href = "index.html";
-                                  }
-
-                                  };
+// Logout
+export function logout() {
+  localStorage.removeItem("user");
+  window.location.href = "index.html";
+}
