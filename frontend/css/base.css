@@ -1,1 +1,118 @@
+/* =========================
+   ROOT VARIABLES (THEMES)
+   ========================= */
 
+   :root {
+     --primary: #0f766e;
+       --secondary: #1e293b;
+         --bg: #f1f5f9;
+           --card: #ffffff;
+             --text: #0f172a;
+               --muted: #64748b;
+                 --border: #e2e8f0;
+                 }
+
+                 body.dark {
+                   --primary: #14b8a6;
+                     --secondary: #0f172a;
+                       --bg: #0f172a;
+                         --card: #1e293b;
+                           --text: #f8fafc;
+                             --muted: #94a3b8;
+                               --border: #334155;
+                               }
+
+                               body.ocean {
+                                 --primary: #0284c7;
+                                   --secondary: #0c4a6e;
+                                     --bg: #e0f2fe;
+                                       --card: #ffffff;
+                                         --text: #082f49;
+                                           --muted: #0369a1;
+                                             --border: #bae6fd;
+                                             }
+
+                                             /* =========================
+                                                GLOBAL RESET
+                                                ========================= */
+
+                                                * {
+                                                  margin: 0;
+                                                    padding: 0;
+                                                      box-sizing: border-box;
+                                                        font-family: 'Poppins', sans-serif;
+                                                        }
+
+                                                        body {
+                                                          background: var(--bg);
+                                                            color: var(--text);
+                                                              height: 100vh;
+                                                              }
+
+                                                              /* =========================
+                                                                 LAYOUT STRUCTURE
+                                                                 ========================= */
+
+                                                                 .layout {
+                                                                   display: flex;
+                                                                     height: 100vh;
+                                                                     }
+
+                                                                     /* Sidebar */
+
+                                                                     .sidebar {
+                                                                       width: 280px;
+                                                                         background: var(--card);
+                                                                           border-right: 1px solid var(--border);
+                                                                             overflow-y: auto;
+                                                                             }
+
+                                                                             .sidebar-header {
+                                                                               padding: 18px;
+                                                                                 font-size: 20px;
+                                                                                   font-weight: 600;
+                                                                                     background: var(--primary);
+                                                                                       color: white;
+                                                                                       }
+
+                                                                                       /* Chat Area */
+
+                                                                                       .chat-area {
+                                                                                         flex: 1;
+                                                                                           display: flex;
+                                                                                             flex-direction: column;
+                                                                                             }
+
+                                                                                             /* Chat Header */
+
+                                                                                             .chat-header {
+                                                                                               padding: 16px;
+                                                                                                 font-weight: 600;
+                                                                                                   border-bottom: 1px solid var(--border);
+                                                                                                     background: var(--card);
+                                                                                                     }
+
+                                                                                                     /* Chat Body */
+
+                                                                                                     .chat-body {
+                                                                                                       flex: 1;
+                                                                                                         padding: 20px;
+                                                                                                           overflow-y: auto;
+                                                                                                           }
+
+                                                                                                           /* Chat Input */
+
+                                                                                                           .chat-input {
+                                                                                                             display: flex;
+                                                                                                               padding: 14px;
+                                                                                                                 border-top: 1px solid var(--border);
+                                                                                                                   background: var(--card);
+                                                                                                                   }
+
+                                                                                                                   .chat-input input {
+                                                                                                                     flex: 1;
+                                                                                                                       padding: 10px 14px;
+                                                                                                                         border-radius: 8px;
+                                                                                                                           border: 1px solid var(--border);
+                                                                                                                             outline: none;
+                                                                                                                             }

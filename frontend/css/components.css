@@ -1,1 +1,137 @@
+/* =========================
+   BUTTONS
+   ========================= */
 
+   button {
+     padding: 10px 16px;
+       border-radius: 8px;
+         border: none;
+           cursor: pointer;
+             background: var(--primary);
+               color: white;
+                 font-weight: 500;
+                   transition: 0.2s ease;
+                   }
+
+                   button:hover {
+                     opacity: 0.9;
+                     }
+
+                     button.secondary {
+                       background: transparent;
+                         color: var(--primary);
+                           border: 1px solid var(--primary);
+                           }
+
+                           /* =========================
+                              AUTH PAGE
+                              ========================= */
+
+                              .auth-container {
+                                display: flex;
+                                  justify-content: center;
+                                    align-items: center;
+                                      height: 100vh;
+                                      }
+
+                                      .auth-card {
+                                        width: 360px;
+                                          background: var(--card);
+                                            padding: 30px;
+                                              border-radius: 16px;
+                                                box-shadow: 0 20px 40px rgba(0,0,0,0.08);
+                                                  text-align: center;
+                                                  }
+
+                                                  .auth-card h1 {
+                                                    margin-bottom: 8px;
+                                                    }
+
+                                                    .auth-card p {
+                                                      color: var(--muted);
+                                                        margin-bottom: 20px;
+                                                          font-size: 14px;
+                                                          }
+
+                                                          .auth-card input {
+                                                            width: 100%;
+                                                              padding: 10px;
+                                                                margin-top: 12px;
+                                                                  border-radius: 8px;
+                                                                    border: 1px solid var(--border);
+                                                                    }
+
+                                                                    /* =========================
+                                                                       MESSAGE BUBBLES
+                                                                       ========================= */
+
+                                                                       .msg {
+                                                                         margin-bottom: 12px;
+                                                                           display: flex;
+                                                                           }
+
+                                                                           .msg.me {
+                                                                             justify-content: flex-end;
+                                                                             }
+
+                                                                             .msg.other {
+                                                                               justify-content: flex-start;
+                                                                               }
+
+                                                                               .bubble {
+                                                                                 max-width: 60%;
+                                                                                   padding: 10px 14px;
+                                                                                     border-radius: 14px;
+                                                                                       font-size: 14px;
+                                                                                         background: var(--card);
+                                                                                           border: 1px solid var(--border);
+                                                                                           }
+
+                                                                                           .msg.me .bubble {
+                                                                                             background: var(--primary);
+                                                                                               color: white;
+                                                                                                 border: none;
+                                                                                                 }
+
+                                                                                                 .meta {
+                                                                                                   font-size: 10px;
+                                                                                                     margin-top: 4px;
+                                                                                                       display: flex;
+                                                                                                         justify-content: space-between;
+                                                                                                         }
+
+                                                                                                         /* =========================
+                                                                                                            CHAT LIST ITEM
+                                                                                                            ========================= */
+
+                                                                                                            .sidebar ul {
+                                                                                                              list-style: none;
+                                                                                                              }
+
+                                                                                                              .sidebar li {
+                                                                                                                padding: 14px;
+                                                                                                                  border-bottom: 1px solid var(--border);
+                                                                                                                    cursor: pointer;
+                                                                                                                      transition: 0.2s;
+                                                                                                                      }
+
+                                                                                                                      .sidebar li:hover {
+                                                                                                                        background: var(--bg);
+                                                                                                                        }
+
+                                                                                                                        /* =========================
+                                                                                                                           BADGE
+                                                                                                                           ========================= */
+
+                                                                                                                           .badge {
+                                                                                                                             background: var(--primary);
+                                                                                                                               color: white;
+                                                                                                                                 font-size: 11px;
+                                                                                                                                   padding: 2px 6px;
+                                                                                                                                     border-radius: 12px;
+                                                                                                                                       margin-left: 6px;
+                                                                                                                                       }
+
+                                                                                                                                       .hidden {
+                                                                                                                                         display: none;
+                                                                                                                                         }
