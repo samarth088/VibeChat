@@ -1,1 +1,15 @@
+.group-layout {
+  padding: 20px;
+}
 
+.group-card {
+  padding: 15px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  margin-bottom: 12px;
+  background: var(--card);
+}
+
+.group-card h3 {
+  margin-bottom: 6px;
+}
