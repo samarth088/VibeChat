@@ -1,1 +1,30 @@
+.settings-container {
+  padding: 20px;
+}
 
+.settings-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 20px;
+  margin-bottom: 20px;
+}
+
+.theme-option {
+  padding: 10px;
+  border: 1px solid var(--border);
+  margin-top: 10px;
+  cursor: pointer;
+  border-radius: 8px;
+}
+
+.theme-option:hover {
+  background: rgba(0,0,0,0.05);
+}
+
+.profile-avatar {
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  margin-bottom: 10px;
+}
