@@ -1,2 +1,2 @@
-// Placeholder for future call logic
-console.log("Call page loaded");
+document.getElementById("callContainer").innerHTML =
+  "<h2>Voice / Video Calls Coming Soon 🎥</h2>";
