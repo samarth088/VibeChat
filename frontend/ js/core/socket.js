@@ -1,29 +1,25 @@
-// =============================
-// Socket Layer
-// =============================
+import { ENV } from "../../config/env.js";
+import { State } from "./state.js";
 
 let socket = null;
 
-function initSocket() {
+export function initSocket() {
+  if (!State.user) return;
 
-  if (!State.currentUser) return;
+  socket = io(ENV.SOCKET_URL, {
+    transports: ["websocket"]
+  });
 
-    socket = io(ENV.SOCKET_URL, {
-        transports: ["websocket"]
-          });
+  socket.on("connect", () => {
+    console.log("🟢 Socket Connected");
+    socket.emit("register", State.user.id);
+  });
 
-            socket.emit("register", State.currentUser.id);
+  socket.on("disconnect", () => {
+    console.log("🔴 Socket Disconnected");
+  });
+}
 
-              socket.on("connect", () => {
-                  console.log("🟢 Socket Connected");
-                    });
-
-                      socket.on("disconnect", () => {
-                          console.log("🔴 Socket Disconnected");
-                            });
-
-                            }
-
-                            function getSocket() {
-                              return socket;
-                              }
+export function getSocket() {
+  return socket;
+}
