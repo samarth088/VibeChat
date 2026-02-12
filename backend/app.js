@@ -1,30 +1,61 @@
-// ================= EXPRESS APP CONFIG =================
+// ================================
+// VibeChat Express App Config
+// ================================
+
 const express = require("express");
 const cors = require("cors");
 
+const authRoutes = require("./routes/auth.routes");
+const userRoutes = require("./routes/user.routes");
+const chatRoutes = require("./routes/chat.routes");
+const groupRoutes = require("./routes/group.routes");
+
+const errorMiddleware = require("./middleware/error.middleware");
+
 const app = express();
 
-// ================= GLOBAL MIDDLEWARE =================
+// ================= MIDDLEWARE =================
+
+// Enable CORS (Later restrict to frontend domain)
 app.use(cors({
-  origin: "*", // production me restrict karna
+  origin: "*",
+  methods: ["GET", "POST", "PUT", "DELETE"],
   credentials: true
 }));
 
+// Parse JSON
 app.use(express.json());
+
+// Parse URL encoded (form support)
 app.use(express.urlencoded({ extended: true }));
 
 // ================= HEALTH CHECK =================
+
 app.get("/", (req, res) => {
-  res.json({ status: "VibeChat API Running 🚀" });
+  res.status(200).json({
+    status: "success",
+    message: "🚀 VibeChat Backend Running"
+  });
 });
 
-// ================= ROUTES =================
-app.use("/api/auth", require("./routes/auth.routes"));
-app.use("/api/users", require("./routes/user.routes"));
-app.use("/api/chats", require("./routes/chat.routes"));
-app.use("/api/groups", require("./routes/group.routes"));
+// ================= API ROUTES =================
+
+app.use("/api/auth", authRoutes);
+app.use("/api/users", userRoutes);
+app.use("/api/chats", chatRoutes);
+app.use("/api/groups", groupRoutes);
+
+// ================= 404 HANDLER =================
+
+app.use((req, res) => {
+  res.status(404).json({
+    error: "Route not found"
+  });
+});
 
 // ================= ERROR HANDLER =================
-app.use(require("./middleware/error.middleware"));
+// (Must be last)
+
+app.use(errorMiddleware);
 
 module.exports = app;
