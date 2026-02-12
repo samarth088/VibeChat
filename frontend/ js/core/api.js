@@ -1,46 +1,22 @@
-// =============================
-// API Layer
-// =============================
+import { ENV } from "../../config/env.js";
+import { State } from "./state.js";
 
-const API = {
+// Generic API helper
+export async function api(path, method = "GET", body = null) {
+  try {
+    const res = await fetch(`${ENV.API_BASE}${path}`, {
+      method,
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: State.user?.id || ""
+      },
+      body: body ? JSON.stringify(body) : null
+    });
 
-  async request(endpoint, method = "GET", data = null) {
-      const options = {
-            method,
-                  headers: {
-                          "Content-Type": "application/json",
-                                  Authorization: State.currentUser?.token || ""
-                                        }
-                                            };
+    return await res.json();
 
-                                                if (data) {
-                                                      options.body = JSON.stringify(data);
-                                                          }
-
-                                                              const res = await fetch(`${ENV.BASE_URL}${endpoint}`, options);
-
-                                                                  if (!res.ok) {
-                                                                        const error = await res.json();
-                                                                              throw new Error(error.error || "Request failed");
-                                                                                  }
-
-                                                                                      return res.json();
-                                                                                        },
-
-                                                                                          login(username, password) {
-                                                                                              return this.request("/auth/login", "POST", { username, password });
-                                                                                                },
-
-                                                                                                  register(username, password) {
-                                                                                                      return this.request("/auth/register", "POST", { username, password });
-                                                                                                        },
-
-                                                                                                          getUsers() {
-                                                                                                              return this.request("/users");
-                                                                                                                },
-
-                                                                                                                  getChats() {
-                                                                                                                      return this.request("/chats");
-                                                                                                                        }
-
-                                                                                                                        };
+  } catch (err) {
+    console.error("API Error:", err);
+    return { error: "Server error" };
+  }
+}
