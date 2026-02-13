@@ -1,137 +1,65 @@
 /* =========================
    BUTTONS
-   ========================= */
+========================= */
+.btn {
+  padding: 10px 14px;
+  border-radius: var(--radius-sm);
+  border: none;
+  cursor: pointer;
+  background: var(--primary);
+  color: var(--text-light);
+  font-size: 0.9rem;
+}
 
-   button {
-     padding: 10px 16px;
-       border-radius: 8px;
-         border: none;
-           cursor: pointer;
-             background: var(--primary);
-               color: white;
-                 font-weight: 500;
-                   transition: 0.2s ease;
-                   }
+.btn:hover {
+  opacity: 0.9;
+}
 
-                   button:hover {
-                     opacity: 0.9;
-                     }
+.btn.secondary {
+  background: var(--secondary);
+}
 
-                     button.secondary {
-                       background: transparent;
-                         color: var(--primary);
-                           border: 1px solid var(--primary);
-                           }
+.btn.danger {
+  background: var(--danger);
+}
 
-                           /* =========================
-                              AUTH PAGE
-                              ========================= */
+/* =========================
+   INPUTS
+========================= */
+.input {
+  width: 100%;
+  padding: 10px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  font-size: 0.9rem;
+}
 
-                              .auth-container {
-                                display: flex;
-                                  justify-content: center;
-                                    align-items: center;
-                                      height: 100vh;
-                                      }
+/* =========================
+   CARD
+========================= */
+.card {
+  background: var(--bg-light);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
+  padding: 16px;
+}
 
-                                      .auth-card {
-                                        width: 360px;
-                                          background: var(--card);
-                                            padding: 30px;
-                                              border-radius: 16px;
-                                                box-shadow: 0 20px 40px rgba(0,0,0,0.08);
-                                                  text-align: center;
-                                                  }
+/* =========================
+   HEADER
+========================= */
+.header {
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--border);
+  font-weight: 600;
+}
 
-                                                  .auth-card h1 {
-                                                    margin-bottom: 8px;
-                                                    }
-
-                                                    .auth-card p {
-                                                      color: var(--muted);
-                                                        margin-bottom: 20px;
-                                                          font-size: 14px;
-                                                          }
-
-                                                          .auth-card input {
-                                                            width: 100%;
-                                                              padding: 10px;
-                                                                margin-top: 12px;
-                                                                  border-radius: 8px;
-                                                                    border: 1px solid var(--border);
-                                                                    }
-
-                                                                    /* =========================
-                                                                       MESSAGE BUBBLES
-                                                                       ========================= */
-
-                                                                       .msg {
-                                                                         margin-bottom: 12px;
-                                                                           display: flex;
-                                                                           }
-
-                                                                           .msg.me {
-                                                                             justify-content: flex-end;
-                                                                             }
-
-                                                                             .msg.other {
-                                                                               justify-content: flex-start;
-                                                                               }
-
-                                                                               .bubble {
-                                                                                 max-width: 60%;
-                                                                                   padding: 10px 14px;
-                                                                                     border-radius: 14px;
-                                                                                       font-size: 14px;
-                                                                                         background: var(--card);
-                                                                                           border: 1px solid var(--border);
-                                                                                           }
-
-                                                                                           .msg.me .bubble {
-                                                                                             background: var(--primary);
-                                                                                               color: white;
-                                                                                                 border: none;
-                                                                                                 }
-
-                                                                                                 .meta {
-                                                                                                   font-size: 10px;
-                                                                                                     margin-top: 4px;
-                                                                                                       display: flex;
-                                                                                                         justify-content: space-between;
-                                                                                                         }
-
-                                                                                                         /* =========================
-                                                                                                            CHAT LIST ITEM
-                                                                                                            ========================= */
-
-                                                                                                            .sidebar ul {
-                                                                                                              list-style: none;
-                                                                                                              }
-
-                                                                                                              .sidebar li {
-                                                                                                                padding: 14px;
-                                                                                                                  border-bottom: 1px solid var(--border);
-                                                                                                                    cursor: pointer;
-                                                                                                                      transition: 0.2s;
-                                                                                                                      }
-
-                                                                                                                      .sidebar li:hover {
-                                                                                                                        background: var(--bg);
-                                                                                                                        }
-
-                                                                                                                        /* =========================
-                                                                                                                           BADGE
-                                                                                                                           ========================= */
-
-                                                                                                                           .badge {
-                                                                                                                             background: var(--primary);
-                                                                                                                               color: white;
-                                                                                                                                 font-size: 11px;
-                                                                                                                                   padding: 2px 6px;
-                                                                                                                                     border-radius: 12px;
-                                                                                                                                       margin-left: 6px;
-                                                                                                                                       }
-
-                                                                                                                                       .hidden {
-                                                                                                                                         display: none;
-                                                                                                                                         }
+/* =========================
+   AVATAR
+========================= */
+.avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: #ddd;
+  object-fit: cover;
+}
