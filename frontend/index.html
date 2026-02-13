@@ -1,325 +1,142 @@
-import React, { useEffect, useState } from "react";
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>VibeChat | Login</title>
 
-// ChatApp-with-Auth.jsx
-// Single-file React SPA (Tailwind classes) with Login + Signup + protected Chat screen.
-// - Default export: App
-// - Mock API included (replace with real backend endpoints)
-// - Uses localStorage for token (you should replace with httpOnly cookie in production)
-// - Tailwind required in the host project (or replace classes with your CSS)
+  <!-- Base CSS -->
+  <link rel="stylesheet" href="css/base.css" />
+  <link rel="stylesheet" href="css/components.css" />
 
-/*
-How to use:
-1. Create a React project (Vite / Create React App).
-2. Install Tailwind and enable it.
-3. Drop this file in src/ and import + render <App /> inside index.jsx.
-4. Replace mockApi.* calls with real fetch() to your backend.
-*/
-
-// ---------------------
-// Mock API (replace in production)
-// ---------------------
-const mockDB = {
-  users: [
-    { id: "u1", name: "Test User", email: "test@example.com", password: "password123" },
-  ],
-};
-
-const mockApi = {
-  signup: async ({ name, email, password }) => {
-    // simulate server delay
-    await new Promise((r) => setTimeout(r, 600));
-    const exists = mockDB.users.find((u) => u.email === email.toLowerCase());
-    if (exists) throw new Error("Email already registered");
-    const user = { id: `u${Date.now()}`, name, email: email.toLowerCase(), password };
-    mockDB.users.push(user);
-    // token should be JWT from backend — here we return a fake token
-    return { token: btoa(JSON.stringify({ id: user.id, email: user.email })), user: { id: user.id, name: user.name, email: user.email } };
-  },
-  login: async ({ email, password }) => {
-    await new Promise((r) => setTimeout(r, 400));
-    const user = mockDB.users.find((u) => u.email === email.toLowerCase() && u.password === password);
-    if (!user) throw new Error("Invalid credentials");
-    return { token: btoa(JSON.stringify({ id: user.id, email: user.email })), user: { id: user.id, name: user.name, email: user.email } };
-  },
-  validateToken: async (token) => {
-    await new Promise((r) => setTimeout(r, 200));
-    try {
-      const parsed = JSON.parse(atob(token));
-      const user = mockDB.users.find((u) => u.id === parsed.id && u.email === parsed.email);
-      if (!user) throw new Error("Invalid token");
-      return { valid: true, user: { id: user.id, name: user.name, email: user.email } };
-    } catch (e) {
-      return { valid: false };
+  <!-- Page specific -->
+  <style>
+    body {
+      display: flex;
+      justify-content: center;
+      align-items: center;
     }
-  },
-};
 
-// ---------------------
-// Small helpers
-// ---------------------
-const storage = {
-  getToken: () => localStorage.getItem("chat_token"),
-  setToken: (t) => localStorage.setItem("chat_token", t),
-  clearToken: () => localStorage.removeItem("chat_token"),
-};
+    .auth-box {
+      width: 100%;
+      max-width: 380px;
+      background: #fff;
+      border-radius: 12px;
+      padding: 24px;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.08);
+    }
 
-// ---------------------
-// Components
-// ---------------------
+    .auth-title {
+      text-align: center;
+      font-size: 1.4rem;
+      margin-bottom: 16px;
+    }
 
-function Input({ label, id, type = "text", value, onChange, placeholder }) {
-  return (
-    <label className="block text-sm">
-      <div className="mb-1 text-gray-700">{label}</div>
-      <input
-        id={id}
-        type={type}
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        placeholder={placeholder}
-        className="w-full px-3 py-2 border rounded shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-200"
-      />
-    </label>
-  );
-}
+    .auth-tabs {
+      display: flex;
+      margin-bottom: 20px;
+    }
 
-function Button({ children, onClick, type = "button", className = "" }) {
-  return (
-    <button
-      type={type}
-      onClick={onClick}
-      className={`px-4 py-2 rounded-md font-medium shadow ${className}`}
-    >
-      {children}
-    </button>
-  );
-}
+    .auth-tabs button {
+      flex: 1;
+      padding: 10px;
+      border: none;
+      cursor: pointer;
+      background: #eee;
+      font-weight: 600;
+    }
 
-function AuthBox({ onLoginSuccess }) {
-  const [mode, setMode] = useState("login"); // 'login'|'signup'
-  return (
-    <div className="max-w-md w-full bg-white p-6 rounded-lg shadow-md">
-      <div className="flex items-center justify-between mb-4">
-        <h2 className="text-xl font-semibold">{mode === "login" ? "Login" : "Create account"}</h2>
-        <div className="text-sm text-gray-500">Simple, fast, replaceable</div>
-      </div>
-      {mode === "login" ? (
-        <LoginForm onLoginSuccess={onLoginSuccess} switchToSignup={() => setMode("signup")} />
-      ) : (
-        <SignupForm onSignupSuccess={onLoginSuccess} switchToLogin={() => setMode("login")} />
-      )}
-      <div className="mt-4 text-center text-xs text-gray-500">
-        By continuing you agree to terms. (Replace with real terms.)
-      </div>
+    .auth-tabs button.active {
+      background: #111;
+      color: #fff;
+    }
+
+    .auth-form {
+      display: none;
+    }
+
+    .auth-form.active {
+      display: block;
+    }
+
+    .auth-form input {
+      width: 100%;
+      padding: 10px;
+      margin-bottom: 12px;
+      border-radius: 6px;
+      border: 1px solid #ccc;
+    }
+
+    .auth-form button {
+      width: 100%;
+      padding: 10px;
+      background: #111;
+      color: #fff;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+
+    .auth-form button:hover {
+      opacity: 0.9;
+    }
+  </style>
+</head>
+
+<body>
+
+  <div class="auth-box">
+    <div class="auth-title">VibeChat</div>
+
+    <!-- Tabs -->
+    <div class="auth-tabs">
+      <button id="loginTab" class="active">Login</button>
+      <button id="signupTab">Signup</button>
     </div>
-  );
-}
 
-function LoginForm({ onLoginSuccess, switchToSignup }) {
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [error, setError] = useState(null);
-  const [loading, setLoading] = useState(false);
-
-  const submit = async (e) => {
-    e && e.preventDefault();
-    setError(null);
-    if (!email || !password) return setError("Enter email and password");
-    setLoading(true);
-    try {
-      const { token, user } = await mockApi.login({ email, password });
-      storage.setToken(token);
-      onLoginSuccess({ token, user });
-    } catch (err) {
-      setError(err.message || "Login failed");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  return (
-    <form onSubmit={submit} className="space-y-3">
-      {error && <div className="text-sm text-red-600">{error}</div>}
-      <Input label="Email" id="login-email" value={email} onChange={setEmail} placeholder="you@example.com" />
-      <Input label="Password" id="login-pass" type="password" value={password} onChange={setPassword} placeholder="••••••" />
-      <div className="flex items-center justify-between">
-        <Button type="submit" className="bg-indigo-600 text-white hover:bg-indigo-700" onClick={submit}>
-          {loading ? "Signing in..." : "Sign in"}
-        </Button>
-        <button type="button" onClick={switchToSignup} className="text-sm text-indigo-600 underline">
-          Create account
-        </button>
-      </div>
+    <!-- Login Form -->
+    <form id="loginForm" class="auth-form active">
+      <input type="email" placeholder="Email" required />
+      <input type="password" placeholder="Password" required />
+      <button type="submit">Login</button>
     </form>
-  );
-}
 
-function SignupForm({ onSignupSuccess, switchToLogin }) {
-  const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [error, setError] = useState(null);
-  const [loading, setLoading] = useState(false);
-
-  const submit = async (e) => {
-    e && e.preventDefault();
-    setError(null);
-    if (!name || !email || !password) return setError("All fields are required");
-    setLoading(true);
-    try {
-      const { token, user } = await mockApi.signup({ name, email, password });
-      storage.setToken(token);
-      onSignupSuccess({ token, user });
-    } catch (err) {
-      setError(err.message || "Signup failed");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  return (
-    <form onSubmit={submit} className="space-y-3">
-      {error && <div className="text-sm text-red-600">{error}</div>}
-      <Input label="Full name" id="signup-name" value={name} onChange={setName} placeholder="Your name" />
-      <Input label="Email" id="signup-email" value={email} onChange={setEmail} placeholder="you@example.com" />
-      <Input label="Password" id="signup-pass" type="password" value={password} onChange={setPassword} placeholder="Minimum 8 chars" />
-      <div className="flex items-center justify-between">
-        <Button type="submit" className="bg-green-600 text-white hover:bg-green-700" onClick={submit}>
-          {loading ? "Creating..." : "Create account"}
-        </Button>
-        <button type="button" onClick={switchToLogin} className="text-sm text-gray-700 underline">
-          Have an account? Sign in
-        </button>
-      </div>
+    <!-- Signup Form -->
+    <form id="signupForm" class="auth-form">
+      <input type="text" placeholder="Full Name" required />
+      <input type="email" placeholder="Email" required />
+      <input type="password" placeholder="Password" required />
+      <button type="submit">Create Account</button>
     </form>
-  );
-}
+  </div>
 
-function SimpleHeader({ user, onLogout }) {
-  return (
-    <div className="flex items-center justify-between border-b px-4 py-3">
-      <div className="flex items-center gap-3">
-        <div className="h-9 w-9 rounded-full bg-indigo-500 flex items-center justify-center text-white font-semibold">{user.name[0]}</div>
-        <div>
-          <div className="text-sm font-medium">{user.name}</div>
-          <div className="text-xs text-gray-500">{user.email}</div>
-        </div>
-      </div>
-      <div>
-        <button onClick={onLogout} className="text-sm px-3 py-1 rounded-md border">Logout</button>
-      </div>
-    </div>
-  );
-}
+  <!-- Page Script -->
+  <script>
+    const loginTab = document.getElementById("loginTab");
+    const signupTab = document.getElementById("signupTab");
+    const loginForm = document.getElementById("loginForm");
+    const signupForm = document.getElementById("signupForm");
 
-function ChatPage({ user, onLogout }) {
-  // skeleton chat UI; integrate socket or REST in future
-  const [messages, setMessages] = useState([
-    { id: "m1", sender: "system", text: `Welcome, ${user.name}! This is a demo chat.` },
-  ]);
-  const [text, setText] = useState("");
+    loginTab.onclick = () => {
+      loginTab.classList.add("active");
+      signupTab.classList.remove("active");
+      loginForm.classList.add("active");
+      signupForm.classList.remove("active");
+    };
 
-  const send = () => {
-    if (!text.trim()) return;
-    const msg = { id: `m${Date.now()}`, sender: user.id, text: text.trim(), createdAt: new Date().toISOString() };
-    setMessages((s) => [...s, msg]);
-    setText("");
-  };
+    signupTab.onclick = () => {
+      signupTab.classList.add("active");
+      loginTab.classList.remove("active");
+      signupForm.classList.add("active");
+      loginForm.classList.remove("active");
+    };
 
-  return (
-    <div className="flex flex-col h-full">
-      <SimpleHeader user={user} onLogout={onLogout} />
-      <div className="flex-1 overflow-auto p-4 bg-gray-50">
-        <div className="max-w-2xl mx-auto space-y-3">
-          {messages.map((m) => (
-            <div key={m.id} className={`flex ${m.sender === user.id ? "justify-end" : "justify-start"}`}>
-              <div className={`px-3 py-2 rounded-lg ${m.sender === user.id ? "bg-indigo-600 text-white" : "bg-white border"}`}>
-                {m.text}
-                {m.createdAt && <div className="text-xs text-gray-400 mt-1 text-right">{new Date(m.createdAt).toLocaleTimeString()}</div>}
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-      <div className="p-4 border-t">
-        <div className="max-w-2xl mx-auto flex gap-3">
-          <input value={text} onChange={(e) => setText(e.target.value)} placeholder="Type a message..." className="flex-1 px-3 py-2 border rounded" />
-          <Button className="bg-indigo-600 text-white" onClick={send}>Send</Button>
-        </div>
-      </div>
-    </div>
-  );
-}
+    // TEMP: Fake login redirect
+    loginForm.onsubmit = (e) => {
+      e.preventDefault();
+      window.location.href = "chat.html";
+    };
+  </script>
 
-// ---------------------
-// App (default export)
-// ---------------------
-export default function App() {
-  const [user, setUser] = useState(null);
-  const [checking, setChecking] = useState(true);
-
-  useEffect(() => {
-    // on mount, validate token
-    (async () => {
-      const token = storage.getToken();
-      if (!token) {
-        setChecking(false);
-        return;
-      }
-      try {
-        const { valid, user } = await mockApi.validateToken(token);
-        if (valid) setUser(user);
-        else storage.clearToken();
-      } catch (e) {
-        storage.clearToken();
-      } finally {
-        setChecking(false);
-      }
-    })();
-  }, []);
-
-  const handleAuthSuccess = ({ token, user }) => {
-    // token already stored in storage by form — keep single source
-    setUser(user);
-  };
-
-  const logout = () => {
-    storage.clearToken();
-    setUser(null);
-  };
-
-  if (checking) {
-    return (
-      <div className="h-screen flex items-center justify-center bg-gray-100">
-        <div className="text-gray-600">Checking session...</div>
-      </div>
-    );
-  }
-
-  if (!user) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-gray-100 to-white p-6">
-        <div className="w-full max-w-4xl grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div className="hidden md:flex flex-col justify-center p-8 bg-indigo-700 text-white rounded-lg">
-            <h1 className="text-3xl font-bold mb-2">VibeChat</h1>
-            <p className="text-sm opacity-90">A focused chat UI skeleton. Replace mock API with real backend. Keep the frontend structure clean and shast — Marathi “शिस्त” (discipline) matters in architecture.</p>
-            <ul className="mt-4 text-sm space-y-1">
-              <li>• Clean state store</li>
-              <li>• Socket-ready (add socket.js)</li>
-              <li>• Replace localStorage token in production</li>
-            </ul>
-          </div>
-          <div className="flex items-center justify-center">
-            <AuthBox onLoginSuccess={handleAuthSuccess} />
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="h-screen">
-      <ChatPage user={user} onLogout={logout} />
-    </div>
-  );
-}
+</body>
+</html>
