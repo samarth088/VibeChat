@@ -12,7 +12,215 @@
 
   <style>
     body {
+      margin: 0;<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>VibeChat</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <!-- Base styles -->
+  <link rel="stylesheet" href="css/base.css" />
+  <link rel="stylesheet" href="css/components.css" />
+  <link rel="stylesheet" href="css/chat.css" />
+
+  <style>
+    body {
       margin: 0;
+      height: 100vh;
+      display: flex;
+      font-family: system-ui, sans-serif;
+      background: #f4f5f7;
+    }
+
+    /* Layout */
+    .app {
+      display: flex;
+      width: 100%;
+      height: 100vh;
+    }
+
+    /* Sidebar */
+    .sidebar {
+      width: 300px;
+      background: #111;
+      color: #fff;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .sidebar-header {
+      padding: 16px;
+      font-size: 1.1rem;
+      font-weight: 600;
+      border-bottom: 1px solid #333;
+    }
+
+    .chat-list {
+      flex: 1;
+      overflow-y: auto;
+    }
+
+    .chat-item {
+      padding: 12px 16px;
+      border-bottom: 1px solid #222;
+      cursor: pointer;
+    }
+
+    .chat-item:hover,
+    .chat-item.active {
+      background: #222;
+    }
+
+    .chat-name {
+      font-weight: 500;
+      font-size: 0.95rem;
+    }
+
+    .chat-last {
+      font-size: 0.8rem;
+      color: #aaa;
+      margin-top: 2px;
+    }
+
+    /* Chat Area */
+    .chat-area {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      background: #fff;
+    }
+
+    .chat-header {
+      padding: 14px 18px;
+      border-bottom: 1px solid #ddd;
+      font-weight: 600;
+    }
+
+    .messages {
+      flex: 1;
+      padding: 16px;
+      overflow-y: auto;
+      background: #f9f9f9;
+    }
+
+    .message {
+      max-width: 70%;
+      margin-bottom: 10px;
+      padding: 10px 12px;
+      border-radius: 10px;
+      font-size: 0.9rem;
+    }
+
+    .message.incoming {
+      background: #e5e5ea;
+      align-self: flex-start;
+    }
+
+    .message.outgoing {
+      background: #111;
+      color: #fff;
+      align-self: flex-end;
+    }
+
+    .chat-input {
+      display: flex;
+      padding: 12px;
+      border-top: 1px solid #ddd;
+    }
+    .messages {
+      flex: 1;
+      padding: 16px;
+      overflow-y: auto;
+      background: #f9f9f9;
+
+  display: flex;
+  flex-direction: column;
+}
+
+    .chat-input input {
+      flex: 1;
+      padding: 10px;
+      border-radius: 6px;
+      border: 1px solid #ccc;
+      outline: none;
+    }
+
+    .chat-input button {
+      margin-left: 8px;
+      padding: 10px 14px;
+      border: none;
+      background: #111;
+      color: #fff;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+  </style>
+</head>
+
+<body>
+
+<div class="app">
+
+  <!-- LEFT: Chat List -->
+  <aside class="sidebar">
+    <div class="sidebar-header">Chats</div>
+
+    <div class="chat-list">
+      <div class="chat-item active">
+        <div class="chat-name">Rahul</div>
+        <div class="chat-last">Kal baat karte hain</div>
+      </div>
+
+      <div class="chat-item">
+        <div class="chat-name">Office Group</div>
+        <div class="chat-last">Meeting at 5 PM</div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- RIGHT: Chat Area -->
+  <main class="chat-area">
+    <div class="chat-header">Rahul</div>
+
+    <div class="messages">
+      <div class="message incoming">Hello bhai 👋</div>
+      <div class="message outgoing">Haan bol</div>
+      <div class="message incoming">Kaam ho gaya?</div>
+    </div>
+
+    <form class="chat-input">
+      <input type="text" placeholder="Type a message…" />
+      <button type="submit">Send</button>
+    </form>
+  </main>
+
+</div>
+
+<!-- Page JS -->
+<script>
+  const form = document.querySelector(".chat-input");
+  const input = form.querySelector("input");
+  const messages = document.querySelector(".messages");
+
+  form.addEventListener("submit", (e) => {
+    e.preventDefault();
+    const text = input.value.trim();
+    if (!text) return;
+
+    const msg = document.createElement("div");
+    msg.className = "message outgoing";
+    msg.textContent = text;
+    messages.appendChild(msg);
+
+    input.value = "";
+    messages.scrollTop = messages.scrollHeight;
+  });
+</script>
+
+</body>
+</html>
+
       height: 100vh;
       display: flex;
       font-family: system-ui, sans-serif;
