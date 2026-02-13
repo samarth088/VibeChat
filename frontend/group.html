@@ -1,24 +1,263 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
   <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-      <title>VibeChat - Groups</title>
+  <title>VibeChat | Group</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
-        <link rel="stylesheet" href="css/base.css" />
-          <link rel="stylesheet" href="css/components.css" />
-            <link rel="stylesheet" href="css/group.css" />
-            </head>
-            <body>
+  <!-- Base -->
+  <link rel="stylesheet" href="css/base.css" />
+  <link rel="stylesheet" href="css/components.css" />
+  <link rel="stylesheet" href="css/group.css" />
 
-            <div class="group-container">
-              <h1>Groups</h1>
-                <div id="groupList"></div>
-                </div>
+  <style>
+    body {
+      margin: 0;
+      height: 100vh;
+      display: flex;
+      font-family: system-ui, sans-serif;
+      background: #f4f5f7;
+    }
 
-                <script src="config/env.js"></script>
-                <script src="js/core/socket.js"></script>
-                <script src="js/pages/group.js"></script>
+    .app {
+      display: flex;
+      width: 100%;
+      height: 100vh;
+    }
 
-                </body>
-                </html>
+    /* LEFT: Group List */
+    .sidebar {
+      width: 280px;
+      background: #0f172a;
+      color: #fff;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .sidebar-header {
+      padding: 16px;
+      font-weight: 600;
+      border-bottom: 1px solid #1e293b;
+    }
+
+    .group-list {
+      flex: 1;
+      overflow-y: auto;
+    }
+
+    .group-item {
+      padding: 12px 16px;
+      cursor: pointer;
+      border-bottom: 1px solid #1e293b;
+    }
+
+    .group-item.active,
+    .group-item:hover {
+      background: #1e293b;
+    }
+
+    .group-name {
+      font-size: 0.95rem;
+      font-weight: 500;
+    }
+
+    .group-last {
+      font-size: 0.8rem;
+      color: #94a3b8;
+      margin-top: 2px;
+    }
+
+    /* CENTER: Chat Area */
+    .chat-area {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      background: #fff;
+    }
+
+    .chat-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 14px 18px;
+      border-bottom: 1px solid #ddd;
+    }
+
+    .chat-header .title {
+      font-weight: 600;
+    }
+
+    .chat-header button {
+      border: none;
+      background: none;
+      cursor: pointer;
+      font-size: 1.2rem;
+    }
+
+    .messages {
+      flex: 1;
+      padding: 16px;
+      overflow-y: auto;
+      background: #f9fafb;
+    }
+
+    .message {
+      max-width: 70%;
+      margin-bottom: 12px;
+      padding: 10px 12px;
+      border-radius: 10px;
+      font-size: 0.9rem;
+    }
+
+    .incoming {
+      background: #e5e7eb;
+      align-self: flex-start;
+    }
+
+    .outgoing {
+      background: #0f172a;
+      color: #fff;
+      align-self: flex-end;
+    }
+
+    .sender {
+      font-size: 0.7rem;
+      font-weight: 600;
+      margin-bottom: 4px;
+      opacity: 0.7;
+    }
+
+    .chat-input {
+      display: flex;
+      padding: 12px;
+      border-top: 1px solid #ddd;
+    }
+
+    .chat-input input {
+      flex: 1;
+      padding: 10px;
+      border-radius: 6px;
+      border: 1px solid #ccc;
+    }
+
+    .chat-input button {
+      margin-left: 8px;
+      padding: 10px 14px;
+      border: none;
+      background: #0f172a;
+      color: #fff;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+
+    /* RIGHT: Members Panel */
+    .members {
+      width: 240px;
+      background: #f1f5f9;
+      border-left: 1px solid #ddd;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .members-header {
+      padding: 14px;
+      font-weight: 600;
+      border-bottom: 1px solid #ddd;
+    }
+
+    .member {
+      padding: 10px 14px;
+      font-size: 0.85rem;
+      display: flex;
+      justify-content: space-between;
+    }
+
+    .role {
+      font-size: 0.7rem;
+      color: #475569;
+    }
+  </style>
+</head>
+
+<body>
+
+<div class="app">
+
+  <!-- LEFT -->
+  <aside class="sidebar">
+    <div class="sidebar-header">Groups</div>
+    <div class="group-list">
+      <div class="group-item active">
+        <div class="group-name">Office Team</div>
+        <div class="group-last">Standup at 10 AM</div>
+      </div>
+      <div class="group-item">
+        <div class="group-name">Friends</div>
+        <div class="group-last">Movie night?</div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- CENTER -->
+  <main class="chat-area">
+    <div class="chat-header">
+      <div class="title">Office Team</div>
+      <button title="Group settings">⚙️</button>
+    </div>
+
+    <div class="messages">
+      <div class="message incoming">
+        <div class="sender">Ankit • Admin</div>
+        Please update status.
+      </div>
+
+      <div class="message outgoing">
+        <div class="sender">You</div>
+        Done 👍
+      </div>
+    </div>
+
+    <form class="chat-input">
+      <input type="text" placeholder="Message group…" />
+      <button type="submit">Send</button>
+    </form>
+  </main>
+
+  <!-- RIGHT -->
+  <aside class="members">
+    <div class="members-header">Members</div>
+    <div class="member">
+      <span>Ankit</span><span class="role">Admin</span>
+    </div>
+    <div class="member">
+      <span>Raj</span><span class="role">You</span>
+    </div>
+    <div class="member">
+      <span>Pooja</span><span class="role">Member</span>
+    </div>
+  </aside>
+
+</div>
+
+<script>
+  const form = document.querySelector(".chat-input");
+  const input = form.querySelector("input");
+  const messages = document.querySelector(".messages");
+
+  form.addEventListener("submit", e => {
+    e.preventDefault();
+    const text = input.value.trim();
+    if (!text) return;
+
+    const msg = document.createElement("div");
+    msg.className = "message outgoing";
+    msg.innerHTML = `<div class="sender">You</div>${text}`;
+    messages.appendChild(msg);
+
+    input.value = "";
+    messages.scrollTop = messages.scrollHeight;
+  });
+</script>
+
+</body>
+</html>
