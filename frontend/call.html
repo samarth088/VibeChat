@@ -1,17 +1,167 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <meta charset="UTF-8"/>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-      <title>Calls</title>
+  <meta charset="UTF-8" />
+  <title>VibeChat | Call</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
-        <link rel="stylesheet" href="css/base.css" />
-        </head>
-        <body>
+  <link rel="stylesheet" href="css/base.css" />
+  <link rel="stylesheet" href="css/components.css" />
 
-        <div class="call-screen">
-          <h1>Calls (Coming Soon)</h1>
-          </div>
+  <style>
+    body {
+      margin: 0;
+      height: 100vh;
+      font-family: system-ui, sans-serif;
+      background: #020617;
+      color: #fff;
+    }
 
-          </body>
-          </html>
+    .call {
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      position: relative;
+    }
+
+    /* ===== COMMON ===== */
+    .info {
+      padding: 14px;
+      font-size: 0.9rem;
+      opacity: 0.8;
+    }
+
+    .controls {
+      height: 80px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 16px;
+      border-top: 1px solid #1e293b;
+      background: #020617;
+    }
+
+    .btn {
+      width: 52px;
+      height: 52px;
+      border-radius: 50%;
+      border: none;
+      cursor: pointer;
+      background: #1e293b;
+      color: #fff;
+      font-size: 1.1rem;
+    }
+
+    .btn.danger {
+      background: #b91c1c;
+    }
+
+    /* ===== VIDEO CALL ===== */
+    .video-area {
+      flex: 1;
+      position: relative;
+      background: #000;
+    }
+
+    .remote-video {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    .local-video {
+      width: 160px;
+      height: 120px;
+      position: absolute;
+      bottom: 20px;
+      right: 20px;
+      border-radius: 10px;
+      border: 2px solid #fff;
+      background: #000;
+    }
+
+    /* ===== VOICE CALL ===== */
+    .voice-area {
+      flex: 1;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      font-size: 1.2rem;
+      opacity: 0.9;
+    }
+  </style>
+</head>
+
+<body>
+
+<div class="call">
+
+  <div class="info" id="callInfo">Calling…</div>
+
+  <!-- VIDEO CALL UI -->
+  <div class="video-area" id="videoUI" hidden>
+    <video class="remote-video" autoplay playsinline></video>
+    <video class="local-video" autoplay muted playsinline></video>
+  </div>
+
+  <!-- VOICE CALL UI -->
+  <div class="voice-area" id="voiceUI" hidden>
+    <div>🔊 Voice Call in progress</div>
+  </div>
+
+  <!-- CONTROLS -->
+  <div class="controls">
+    <button class="btn" id="micBtn">🎤</button>
+    <button class="btn" id="camBtn">🎥</button>
+    <button class="btn danger" id="endBtn">📞</button>
+  </div>
+
+</div>
+
+<script>
+  const params = new URLSearchParams(window.location.search);
+  const callType = params.get("type"); // voice | video
+
+  const videoUI = document.getElementById("videoUI");
+  const voiceUI = document.getElementById("voiceUI");
+  const camBtn = document.getElementById("camBtn");
+
+  const localVideo = document.querySelector(".local-video");
+
+  let mediaStream;
+
+  async function startCall() {
+    if (callType === "video") {
+      videoUI.hidden = false;
+      camBtn.style.display = "inline-block";
+
+      mediaStream = await navigator.mediaDevices.getUserMedia({
+        video: true,
+        audio: true
+      });
+
+      localVideo.srcObject = mediaStream;
+
+    } else {
+      // VOICE CALL
+      voiceUI.hidden = false;
+      camBtn.style.display = "none";
+
+      mediaStream = await navigator.mediaDevices.getUserMedia({
+        audio: true
+      });
+    }
+  }
+
+  startCall();
+
+  document.getElementById("endBtn").onclick = () => {
+    if (mediaStream) {
+      mediaStream.getTracks().forEach(t => t.stop());
+    }
+    window.location.href = "chat.html";
+  };
+</script>
+
+</body>
+</html>
