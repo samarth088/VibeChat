@@ -2,30 +2,30 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-      <title>VibeChat</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>VibeChat</title>
 
-        <link rel="stylesheet" href="css/base.css" />
-          <link rel="stylesheet" href="css/components.css" />
-          </head>
-          <body>
+  <link rel="stylesheet" href="css/base.css" />
+  <link rel="stylesheet" href="css/components.css" />
+</head>
 
-            <div class="auth-container">
-                <div class="auth-card">
-                      <h1>VibeChat</h1>
-                            <p>Connect. Chat. Vibe.</p>
+<body>
 
-                                  <input id="username" placeholder="Username" />
-                                        <input id="password" type="password" placeholder="Password" />
+  <div class="auth-container">
+    <div class="auth-card">
+      <h1>VibeChat</h1>
+      <p>Connect. Chat. Vibe.</p>
 
-                                              <button id="loginBtn">Login</button>
-                                                    <button id="signupBtn" class="secondary">Create Account</button>
-                                                        </div>
-                                                          </div>
+      <input id="username" placeholder="Username" />
+      <input id="password" type="password" placeholder="Password" />
 
-                                                            <script src="config/env.js"></script>
-                                                              <script src="js/core/api.js"></script>
-                                                                <script src="js/pages/auth.js"></script>
+      <button id="loginBtn">Login</button>
+      <button id="signupBtn" class="secondary">Create Account</button>
+    </div>
+  </div>
 
-                                                                </body>
-                                                                </html>
+  <!-- IMPORTANT: Use module -->
+  <script type="module" src="js/pages/auth.js"></script>
+
+</body>
+</html>
