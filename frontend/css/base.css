@@ -1,70 +1,141 @@
 /* =========================
-   BASE RESET
+   base.css
+   - Reset
+   - Theme variables (light/dark)
+   - Core utilities
+   - Typography + focus states
 ========================= */
-* {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
-}
 
-html, body {
-  height: 100%;
-  font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
-  background: var(--bg-main);
-  color: var(--text-main);
-}
-
-/* =========================
-   CSS VARIABLES (THEME)
-========================= */
-:root {
-  /* Colors */
+:root{
+  /* Colors (light theme) */
   --bg-main: #f4f5f7;
-  --bg-dark: #020617;
-  --bg-light: #ffffff;
+  --bg-surface: #ffffff;
+  --primary: #0f172a;      /* dark navy */
+  --accent: #0ea5a4;       /* teal */
+  --muted: #6b7280;
+  --border: #e6e9ee;
+  --danger: #ef4444;
+  --shadow-sm: 0 4px 14px rgba(16,24,40,0.06);
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --transition-fast: 180ms ease;
+  --max-page-width: 1200px;
+  --font-sans: Inter, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+}
 
-  --primary: #111111;
-  --secondary: #1e293b;
-  --danger: #b91c1c;
+/* Dark theme support (toggle .dark on <html> or via prefers-color-scheme) */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg-main: #071021;
+    --bg-surface: #071428;
+    --primary: #e6eef6;
+    --accent: #2dd4bf;
+    --muted: #94a3b8;
+    --border: #0b1220;
+    --shadow-sm: none;
+  }
+}
 
-  --text-main: #111111;
-  --text-muted: #6b7280;
-  --text-light: #ffffff;
-
-  --border: #e5e7eb;
-
-  /* Sizes */
-  --radius-sm: 6px;
-  --radius-md: 10px;
-  --radius-lg: 14px;
-
-  --shadow-sm: 0 2px 6px rgba(0,0,0,0.05);
-  --shadow-md: 0 6px 16px rgba(0,0,0,0.08);
+/* Optional programmatic dark class */
+html.dark {
+  --bg-main: #071021;
+  --bg-surface: #071428;
+  --primary: #e6eef6;
+  --accent: #2dd4bf;
+  --muted: #94a3b8;
+  --border: #0b1220;
 }
 
 /* =========================
-   UTILITIES
+   RESET
 ========================= */
-.flex {
-  display: flex;
+*,
+*::before,
+*::after { box-sizing: border-box; }
+
+html, body, #root {
+  height: 100%;
+  background: var(--bg-main);
+  color: var(--primary);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  line-height: 1.45;
+  font-size: 16px;
 }
 
-.center {
-  display: flex;
-  justify-content: center;
-  align-items: center;
+img, picture, video, canvas {
+  max-width: 100%;
+  display: block;
 }
 
-.space-between {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
+button {
+  background: transparent;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  font: inherit;
 }
 
-.hidden {
-  display: none !important;
+a { color: inherit; text-decoration: none; }
+
+/* =========================
+   ACCESSIBILITY
+========================= */
+:focus {
+  outline: 3px solid color-mix(in srgb, var(--accent) 15%, transparent);
+  outline-offset: 2px;
+  transition: outline var(--transition-fast);
 }
 
-.full-height {
-  height: 100vh;
+.visually-hidden {
+  position: absolute !important;
+  height: 1px; width: 1px;
+  overflow: hidden;
+  clip: rect(1px, 1px, 1px, 1px);
+  white-space: nowrap;
+  border: 0;
+  padding: 0; margin: -1px;
 }
+
+/* =========================
+   LAYOUT UTILITIES
+========================= */
+.container {
+  max-width: var(--max-page-width);
+  margin-inline: auto;
+  padding: 0 16px;
+}
+
+.row { display: flex; gap: 12px; align-items: center; }
+.col { display: flex; flex-direction: column; gap: 12px; }
+
+.flex { display: flex; }
+.center { display:flex; align-items:center; justify-content:center; }
+
+.space-between { display:flex; justify-content:space-between; align-items:center; }
+
+/* spacing helpers */
+.mt-sm { margin-top:8px }
+.mt-md { margin-top:16px }
+.mb-sm { margin-bottom:8px }
+.p-1 { padding:8px }
+.p-2 { padding:12px }
+
+/* =========================
+   TEXT UTILITIES
+========================= */
+.h1 { font-size: 1.25rem; font-weight: 700; }
+.h2 { font-size: 1rem; font-weight: 600; }
+.muted { color: var(--muted); font-size: 0.9rem; }
+
+/* =========================
+   RESPONSIVE BREAKPOINTS
+========================= */
+@media (max-width: 900px) {
+  :root { --max-page-width: 100%; }
+  .container { padding: 0 12px; }
+}
+
+/* small helpers */
+.hidden { display:none !important; }
