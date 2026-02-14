@@ -43,77 +43,91 @@ const handleChatSocket = (io, socket, onlineUsers) => {
   });
 
   // ================= PRIVATE MESSAGE =================
-  socket.on("private-message", async ({ from, to, text }) => {
+socket.on("private-message", async ({ from, to, text }) => {
 
-    try {
+  try {
 
-      let chat = await Chat.findOne({
-        members: { $all: [from, to] }
+    let chat = await Chat.findOne({
+      members: { $all: [from, to] }
+    });
+
+    if (!chat) {
+      chat = await Chat.create({
+        members: [from, to],
+        unreadCounts: {
+          [from]: 0,
+          [to]: 0
+        }
       });
-
-      if (!chat) {
-        chat = await Chat.create({
-          members: [from, to]
-        });
-      }
-
-      const message = await Message.create({
-        chat: chat._id,
-        sender: from,
-        receiver: to,
-        content: text,
-        status: "sent"
-      });
-
-      chat.lastMessage = message._id;
-      await chat.save();
-
-      const receiverSocket = onlineUsers.get(to);
-
-      if (receiverSocket) {
-
-        message.status = "delivered";
-        message.deliveredAt = new Date();
-        await message.save();
-
-        io.to(receiverSocket).emit("private-message", message);
-      }
-
-      socket.emit("message-sent", message);
-
-    } catch (err) {
-      console.error("Private message error:", err);
     }
-  });
+
+    const message = await Message.create({
+      chat: chat._id,
+      sender: from,
+      receiver: to,
+      content: text,
+      status: "sent"
+    });
+
+    // 🔥 Update last message
+    chat.lastMessage = message._id;
+
+    // 🔥 Increase unread count for receiver
+    const currentUnread = chat.unreadCounts.get(to) || 0;
+    chat.unreadCounts.set(to, currentUnread + 1);
+
+    await chat.save();
+
+    const receiverSocket = onlineUsers.get(to);
+
+    if (receiverSocket) {
+
+      message.status = "delivered";
+      message.deliveredAt = new Date();
+      await message.save();
+
+      io.to(receiverSocket).emit("private-message", message);
+    }
+
+    socket.emit("message-sent", message);
+
+  } catch (err) {
+    console.error("Private message error:", err);
+  }
+});
 
   // ================= MESSAGE SEEN =================
   socket.on("message-seen", async (msgId) => {
 
-    try {
+  try {
 
-      const message = await Message.findByIdAndUpdate(
-        msgId,
-        {
-          status: "seen",
-          seenAt: new Date()
-        },
-        { new: true }
-      );
+    const message = await Message.findById(msgId);
+    if (!message) return;
 
-      if (!message) return;
+    message.status = "seen";
+    message.seenAt = new Date();
+    await message.save();
 
-      const senderSocket = onlineUsers.get(message.sender.toString());
+    // 🔥 Reset unread count for that chat
+    const chat = await Chat.findById(message.chat);
 
-      if (senderSocket) {
-        io.to(senderSocket).emit("message-seen", {
-          msgId: message._id
-        });
-      }
-
-    } catch (err) {
-      console.error("Seen error:", err);
+    if (chat) {
+      chat.unreadCounts.set(message.receiver.toString(), 0);
+      await chat.save();
     }
-  });
+
+    const senderSocket = onlineUsers.get(message.sender.toString());
+
+    if (senderSocket) {
+      io.to(senderSocket).emit("message-seen", {
+        msgId: message._id
+      });
+    }
+
+  } catch (err) {
+    console.error("Seen error:", err);
+  }
+});
 
   // ================= TYPING =================
   socket.on("typing", ({ to }) => {
