@@ -13,9 +13,19 @@ const chatSchema = new mongoose.Schema(
     lastMessage: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Message"
+    },
+
+    // 🔥 NEW: unread message tracking
+    unreadCounts: {
+      type: Map,
+      of: Number,
+      default: {}
     }
   },
   { timestamps: true }
 );
+
+// Index for faster lookup
+chatSchema.index({ members: 1 });
 
 module.exports = mongoose.model("Chat", chatSchema);
