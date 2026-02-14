@@ -28,17 +28,24 @@ const userSchema = new mongoose.Schema(
     },
 
     avatar: {
-      type: String, // URL
+      type: String,
       default: ""
     },
 
+    // ✅ ONLINE SYSTEM
     isOnline: {
       type: Boolean,
       default: false
     },
 
     lastSeen: {
-      type: Date
+      type: Date,
+      default: null
+    },
+
+    socketId: {
+      type: String,
+      default: null
     }
   },
   { timestamps: true }
