@@ -1,26 +1,37 @@
-// =============================
-// Menu Logic
-// =============================
+// js/ui/menu.js
+(function () {
+  const menuBtn = document.getElementById("menuBtn");
+  const menu = document.getElementById("chatMenu");
 
-const menuBtn = document.getElementById("menuBtn");
-const menuDropdown = document.getElementById("menuDropdown");
-const logoutBtn = document.getElementById("logoutBtn");
+  if (!menuBtn || !menu) return;
 
-if (menuBtn && menuDropdown) {
+  menuBtn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    menu.classList.toggle("hidden");
+  });
 
-  menuBtn.addEventListener("click", () => {
-      menuDropdown.classList.toggle("hidden");
-        });
+  document.addEventListener("click", () => {
+    menu.classList.add("hidden");
+  });
 
-          document.addEventListener("click", (e) => {
-              if (!menuBtn.contains(e.target)) {
-                    menuDropdown.classList.add("hidden");
-                        }
-                          });
-                          }
+  menu.addEventListener("click", (e) => {
+    const action = e.target.dataset.action;
+    if (!action) return;
 
-                          if (logoutBtn) {
-                            logoutBtn.addEventListener("click", () => {
-                                State.logout();
-                                  });
-                                  }
+    const chatId = App.state.getState().ui.activeChatId;
+
+    switch (action) {
+      case "mute":
+        alert("Muted (dummy)");
+        break;
+      case "clear":
+        App.state.setState({ messages: {} });
+        break;
+      case "delete":
+        alert("Delete chat requires backend");
+        break;
+    }
+
+    menu.classList.add("hidden");
+  });
+})();
