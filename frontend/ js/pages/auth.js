@@ -1,80 +1,48 @@
-import { ENV } from "../../config/env.js";
-
-// DOM
-const usernameInput = document.getElementById("username");
-const passwordInput = document.getElementById("password");
-const loginBtn = document.getElementById("loginBtn");
-const signupBtn = document.getElementById("signupBtn");
-
-// ================= LOGIN =================
-loginBtn.addEventListener("click", async () => {
-
-  const username = usernameInput.value.trim();
-  const password = passwordInput.value.trim();
-
-  if (!username || !password) {
-    alert("Enter username & password");
+// js/pages/settings.js
+(function () {
+  if (!window.App || !App.api || !App.state) {
+    console.error("Core missing");
     return;
   }
 
-  try {
-    const res = await fetch(`${ENV.API_BASE}/auth/login`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({ username, password })
-    });
+  const saveProfileBtn = document.getElementById("saveProfile");
+  const saveLanguageBtn = document.getElementById("saveLanguage");
+  const logoutBtn = document.getElementById("logout");
 
-    const data = await res.json();
-
-    if (data.error) {
-      alert(data.error);
-      return;
+  saveProfileBtn?.addEventListener("click", async () => {
+    const name = document.getElementById("name").value;
+    try {
+      await App.api.request("/user/profile", {
+        method: "PUT",
+        body: { name }
+      });
+      alert("Profile updated");
+    } catch {
+      alert("Profile update failed");
     }
+  });
 
-    localStorage.setItem("user", JSON.stringify(data));
-    window.location.href = "chat.html";
-
-  } catch (err) {
-    console.error(err);
-    alert("Server error");
-  }
-
-});
-
-// ================= SIGNUP =================
-signupBtn.addEventListener("click", async () => {
-
-  const username = usernameInput.value.trim();
-  const password = passwordInput.value.trim();
-
-  if (!username || !password) {
-    alert("Enter username & password");
-    return;
-  }
-
-  try {
-    const res = await fetch(`${ENV.API_BASE}/auth/signup`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({ username, password })
-    });
-
-    const data = await res.json();
-
-    if (data.error) {
-      alert(data.error);
-      return;
+  saveLanguageBtn?.addEventListener("click", async () => {
+    const lang = document.getElementById("language").value;
+    try {
+      await App.api.request("/user/settings", {
+        method: "PUT",
+        body: { language: lang }
+      });
+      alert("Language saved");
+    } catch {
+      alert("Failed to save language");
     }
+  });
 
-    alert("Account created. Login now.");
-
-  } catch (err) {
-    console.error(err);
-    alert("Server error");
-  }
-
-});
+  logoutBtn?.addEventListener("click", async () => {
+    await App.api.logout();
+    App.state.replaceState({
+      currentUser: null,
+      chats: {},
+      messages: {},
+      ui: {}
+    });
+    window.location.href = "index.html";
+  });
+})();
