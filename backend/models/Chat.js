@@ -15,7 +15,7 @@ const chatSchema = new mongoose.Schema(
       ref: "Message"
     },
 
-    // 🔥 NEW: unread message tracking
+    // ===== UNREAD SYSTEM =====
     unreadCounts: {
       type: Map,
       of: Number,
@@ -25,7 +25,7 @@ const chatSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-// Index for faster lookup
+// Index for faster member lookup
 chatSchema.index({ members: 1 });
 
 module.exports = mongoose.model("Chat", chatSchema);
