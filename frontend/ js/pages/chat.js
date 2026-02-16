@@ -1,111 +1,175 @@
-// =============================
-// IMPORTS
-// =============================
-import { API } from "../core/api.js";
-import { State } from "../core/state.js";
-import { initSocket, getSocket } from "../core/socket.js";
+// js/pages/chat.js
 
-// =============================
-// AUTH CHECK
-// =============================
-if (!State.currentUser) {
-  window.location.href = "../../index.html";
-}
+(function () {
+  // ====== SAFETY CHECK ======
+  if (!window.App || !App.state || !App.api || !App.socket) {
+    console.error("Core modules missing");
+    return;
+  }
 
-// =============================
-// INIT SOCKET
-// =============================
-initSocket();
-const socket = getSocket();
+  // ====== DOM REFERENCES ======
+  const chatListEl = document.querySelector(".chat-list");
+  const messagesEl = document.querySelector(".messages");
+  const formEl = document.querySelector(".chat-input");
+  const inputEl = formEl.querySelector("input");
+  const headerTitleEl = document.querySelector(".chat-header .title");
 
-// =============================
-// DOM
-// =============================
-const chatList = document.getElementById("chatList");
-const chatBody = document.getElementById("chatBody");
-const sendBtn = document.getElementById("sendBtn");
-const messageInput = document.getElementById("messageInput");
+  // ====== LOCAL CACHE ======
+  let activeChatId = null;
 
-let activeUserId = null;
+  // ====== HELPERS ======
+  function createMessageBubble(message, isOutgoing) {
+    const div = document.createElement("div");
+    div.className = `message ${isOutgoing ? "outgoing" : "incoming"}`;
+    div.textContent = message.content;
+    return div;
+  }
 
-// =============================
-// LOAD USERS
-// =============================
-async function loadUsers() {
-  const users = await API.getUsers();
+  function scrollToBottom() {
+    messagesEl.scrollTop = messagesEl.scrollHeight;
+  }
 
-  users.forEach(user => {
-    if (user._id === State.currentUser.id) return;
+  // ====== RENDER FUNCTIONS ======
+  function renderChatList(chats) {
+    chatListEl.innerHTML = "";
 
-    const li = document.createElement("li");
-    li.innerText = user.username;
-    li.dataset.id = user._id;
+    Object.values(chats).forEach(chat => {
+      const item = document.createElement("div");
+      item.className = "chat-item";
+      if (chat.id === activeChatId) item.classList.add("active");
 
-    li.onclick = () => {
-      activeUserId = user._id;
-      chatBody.innerHTML = "";
-      document.getElementById("chatHeader").innerText = user.username;
-    };
+      item.innerHTML = `
+        <div class="chat-name">${chat.name}</div>
+        <div class="chat-last">${chat.lastMessage || ""}</div>
+      `;
 
-    chatList.appendChild(li);
-  });
-}
+      item.onclick = () => selectChat(chat.id);
+      chatListEl.appendChild(item);
+    });
+  }
 
-loadUsers();
+  function renderMessages(chatId, messagesMap) {
+    messagesEl.innerHTML = "";
 
-// =============================
-// SEND MESSAGE
-// =============================
-if (sendBtn) {
-  sendBtn.onclick = () => {
-    const text = messageInput.value.trim();
-    if (!text || !activeUserId) return;
+    const msgs = Object.values(messagesMap)
+      .filter(m => m.chatId === chatId)
+      .sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
 
-    socket.emit("private-message", {
-      from: State.currentUser.id,
-      to: activeUserId,
-      text
+    msgs.forEach(msg => {
+      const bubble = createMessageBubble(
+        msg,
+        msg.senderId === App.state.getState().currentUser?.id
+      );
+      messagesEl.appendChild(bubble);
     });
 
-    messageInput.value = "";
-  };
-}
+    scrollToBottom();
+  }
 
-// =============================
-// RECEIVE MESSAGE
-// =============================
-if (socket) {
-  socket.on("private-message", msg => {
-    renderMessage(msg);
+  // ====== CHAT SELECTION ======
+  async function selectChat(chatId) {
+    activeChatId = chatId;
+    App.state.setState({ ui: { activeChatId: chatId } });
+
+    const state = App.state.getState();
+    const chat = state.chats[chatId];
+    if (!chat) return;
+
+    headerTitleEl.textContent = chat.name;
+
+    // Load messages if not already present
+    const hasMessages = Object.values(state.messages)
+      .some(m => m.chatId === chatId);
+
+    if (!hasMessages) {
+      try {
+        const res = await App.api.fetchMessages(chatId);
+        App.state.upsertMessages(res);
+      } catch (err) {
+        console.error("Failed to load messages", err);
+      }
+    }
+
+    renderMessages(chatId, App.state.getState().messages);
+  }
+
+  // ====== SEND MESSAGE ======
+  async function sendMessage(text) {
+    if (!activeChatId || !text) return;
+
+    const user = App.state.getState().currentUser;
+    const tempId = "temp_" + Date.now();
+
+    // Optimistic UI
+    const optimisticMsg = {
+      id: tempId,
+      chatId: activeChatId,
+      senderId: user.id,
+      content: text,
+      createdAt: new Date().toISOString(),
+      status: "sending"
+    };
+
+    App.state.upsertMessages(optimisticMsg);
+    renderMessages(activeChatId, App.state.getState().messages);
+
+    // Try socket first
+    try {
+      App.socket.emit("send_message", {
+        chatId: activeChatId,
+        content: text,
+        tempId
+      });
+    } catch (e) {
+      // fallback to REST
+      try {
+        const saved = await App.api.sendMessageREST(activeChatId, text);
+        App.state.upsertMessages(saved);
+      } catch (err) {
+        console.error("Message send failed", err);
+      }
+    }
+  }
+
+  // ====== SOCKET EVENTS ======
+  App.socket.on("message", (msg) => {
+    App.state.upsertMessages(msg);
+
+    if (msg.chatId === activeChatId) {
+      const bubble = createMessageBubble(msg, false);
+      messagesEl.appendChild(bubble);
+      scrollToBottom();
+    }
   });
 
-  socket.on("message-sent", msg => {
-    renderMessage(msg);
+  // ====== FORM HANDLER ======
+  formEl.addEventListener("submit", (e) => {
+    e.preventDefault();
+    const text = inputEl.value.trim();
+    if (!text) return;
+    inputEl.value = "";
+    sendMessage(text);
   });
-}
 
-// =============================
-// RENDER MESSAGE
-// =============================
-function renderMessage(msg) {
+  // ====== STATE SUBSCRIPTIONS ======
+  App.state.subscribeKey("chats", (chats) => {
+    renderChatList(chats);
+  });
 
-  const isMe = msg.from === State.currentUser.id;
+  // ====== INITIAL LOAD ======
+  async function init() {
+    try {
+      const chats = await App.api.fetchChats();
+      App.state.upsertChats(chats);
 
-  const div = document.createElement("div");
-  div.className = "msg " + (isMe ? "me" : "other");
+      // Auto select first chat
+      const first = chats[0];
+      if (first) selectChat(first.id);
 
-  div.innerHTML = `
-    <div class="bubble">
-      ${msg.text}
-      <div class="meta">
-        <small>${new Date().toLocaleTimeString([], {
-          hour: "2-digit",
-          minute: "2-digit"
-        })}</small>
-      </div>
-    </div>
-  `;
+    } catch (err) {
+      console.error("Init failed", err);
+    }
+  }
 
-  chatBody.appendChild(div);
-  chatBody.scrollTop = chatBody.scrollHeight;
-}
+  init();
+})();
