@@ -1,21 +1,26 @@
-// =============================
-// Tab Switching Logic
-// =============================
+// js/ui/tabs.js
+(function () {
+  const tabs = document.querySelectorAll(".tabs button");
+  if (!tabs.length) return;
 
-const tabButtons = document.querySelectorAll("[data-tab]");
-const tabContents = document.querySelectorAll("[data-content]");
+  tabs.forEach(tab => {
+    tab.addEventListener("click", () => {
+      tabs.forEach(t => t.classList.remove("active"));
+      tab.classList.add("active");
 
-tabButtons.forEach(btn => {
-  btn.addEventListener("click", () => {
+      const target = tab.dataset.tab;
 
-      const target = btn.dataset.tab;
-
-          tabButtons.forEach(b => b.classList.remove("active"));
-              tabContents.forEach(c => c.classList.add("hidden"));
-
-                  btn.classList.add("active");
-
-                      document.querySelector(`[data-content="${target}"]`)
-                            .classList.remove("hidden");
-                              });
-                              });
+      switch (target) {
+        case "chat":
+          window.location.href = "chat.html";
+          break;
+        case "group":
+          window.location.href = "group.html";
+          break;
+        case "call":
+          window.location.href = "call.html";
+          break;
+      }
+    });
+  });
+})();
