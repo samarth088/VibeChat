@@ -1,14 +1,28 @@
-// Username validation
-export function validateUsername(username) {
-  return username && username.length >= 3;
-}
+// js/utils/validators.js
+(function () {
+  window.App = window.App || {};
+  App.utils = App.utils || {};
 
-// Password validation
-export function validatePassword(password) {
-  return password && password.length >= 6;
-}
+  function isEmail(email = "") {
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+  }
 
-// Empty check
-export function isEmpty(value) {
-  return !value || value.trim() === "";
-}
+  function isStrongPassword(password = "") {
+    return password.length >= 6;
+  }
+
+  function isNotEmpty(value = "") {
+    return value.trim().length > 0;
+  }
+
+  function maxLength(value = "", max = 100) {
+    return value.length <= max;
+  }
+
+  App.utils.validators = {
+    isEmail,
+    isStrongPassword,
+    isNotEmpty,
+    maxLength
+  };
+})();
