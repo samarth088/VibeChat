@@ -12,7 +12,11 @@ exports.createOrGetChat = async (req, res, next) => {
 
     if (!chat) {
       chat = await Chat.create({
-        members: [req.user.id, userId]
+        members: [req.user.id, userId],
+        unreadCounts: {
+          [req.user.id]: 0,
+          [userId]: 0
+        }
       });
     }
 
@@ -22,16 +26,35 @@ exports.createOrGetChat = async (req, res, next) => {
   }
 };
 
-// GET USER CHATS
+// 🔥 UPDATED – GET USER CHATS WITH UNREAD
 exports.getUserChats = async (req, res, next) => {
   try {
-    const chats = await Chat.find({
-      members: req.user.id
-    })
-      .populate("members", "username avatar")
-      .populate("lastMessage");
 
-    res.json(chats);
+    const userId = req.user.id;
+
+    const chats = await Chat.find({
+      members: userId
+    })
+      .populate("members", "username avatar isOnline lastSeen")
+      .populate("lastMessage")
+      .sort({ updatedAt: -1 });
+
+    const formatted = chats.map(chat => {
+
+      const otherUser = chat.members.find(
+        m => m._id.toString() !== userId
+      );
+
+      return {
+        _id: chat._id,
+        user: otherUser,
+        lastMessage: chat.lastMessage,
+        unread: chat.unreadCounts?.get(userId) || 0
+      };
+    });
+
+    res.json(formatted);
+
   } catch (err) {
     next(err);
   }
