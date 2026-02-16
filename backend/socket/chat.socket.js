@@ -6,6 +6,7 @@ const handleChatSocket = (io, socket, onlineUsers) => {
 
   // ================= REGISTER =================
   socket.on("register", async (userId) => {
+
     onlineUsers.set(userId, socket.id);
 
     await User.findByIdAndUpdate(userId, {
@@ -19,6 +20,7 @@ const handleChatSocket = (io, socket, onlineUsers) => {
 
   // ================= DISCONNECT =================
   socket.on("disconnect", async () => {
+
     for (let [userId, sockId] of onlineUsers.entries()) {
       if (sockId === socket.id) {
 
@@ -52,10 +54,10 @@ const handleChatSocket = (io, socket, onlineUsers) => {
       if (!chat) {
         chat = await Chat.create({
           members: [from, to],
-          unreadCounts: {
-            [from]: 0,
-            [to]: 0
-          }
+          unreadCounts: new Map([
+            [from.toString(), 0],
+            [to.toString(), 0]
+          ])
         });
       }
 
@@ -67,12 +69,11 @@ const handleChatSocket = (io, socket, onlineUsers) => {
         status: "sent"
       });
 
-      // Update last message
       chat.lastMessage = message._id;
 
       // Increase unread for receiver
-      const currentUnread = chat.unreadCounts.get(to) || 0;
-      chat.unreadCounts.set(to, currentUnread + 1);
+      const currentUnread = chat.unreadCounts.get(to.toString()) || 0;
+      chat.unreadCounts.set(to.toString(), currentUnread + 1);
 
       await chat.save();
 
@@ -84,17 +85,14 @@ const handleChatSocket = (io, socket, onlineUsers) => {
         message.deliveredAt = new Date();
         await message.save();
 
-        // Send message to receiver
         io.to(receiverSocket).emit("private-message", message);
 
-        // 🔥 Emit unread update
         io.to(receiverSocket).emit("unread-update", {
           chatId: chat._id,
-          unread: chat.unreadCounts.get(to)
+          unread: chat.unreadCounts.get(to.toString())
         });
       }
 
-      // Ack back to sender
       socket.emit("message-sent", message);
 
     } catch (err) {
@@ -110,6 +108,8 @@ const handleChatSocket = (io, socket, onlineUsers) => {
       const message = await Message.findById(msgId);
       if (!message) return;
 
+      if (message.status === "seen") return;
+
       message.status = "seen";
       message.seenAt = new Date();
       await message.save();
@@ -117,11 +117,10 @@ const handleChatSocket = (io, socket, onlineUsers) => {
       const chat = await Chat.findById(message.chat);
 
       if (chat) {
-        // Reset unread for receiver
+
         chat.unreadCounts.set(message.receiver.toString(), 0);
         await chat.save();
 
-        // 🔥 Emit unread reset
         socket.emit("unread-update", {
           chatId: chat._id,
           unread: 0
@@ -139,6 +138,64 @@ const handleChatSocket = (io, socket, onlineUsers) => {
     } catch (err) {
       console.error("Seen error:", err);
     }
+  });
+
+  // ================= EDIT MESSAGE =================
+  socket.on("edit-message", async ({ msgId, newText }) => {
+
+    const message = await Message.findById(msgId);
+    if (!message) return;
+
+    message.content = newText;
+    message.isEdited = true;
+    message.editedAt = new Date();
+    await message.save();
+
+    io.emit("message-edited", message);
+  });
+
+  // ================= DELETE MESSAGE =================
+  socket.on("delete-message", async ({ msgId, userId, forEveryone }) => {
+
+    const message = await Message.findById(msgId);
+    if (!message) return;
+
+    if (forEveryone) {
+      message.isDeletedForEveryone = true;
+    } else {
+      message.deletedFor.push(userId);
+    }
+
+    await message.save();
+
+    io.emit("message-deleted", {
+      msgId,
+      forEveryone
+    });
+  });
+
+  // ================= REACTIONS =================
+  socket.on("react-message", async ({ msgId, userId, emoji }) => {
+
+    const message = await Message.findById(msgId);
+    if (!message) return;
+
+    const existing = message.reactions.find(
+      r => r.user.toString() === userId
+    );
+
+    if (existing) {
+      existing.emoji = emoji;
+    } else {
+      message.reactions.push({ user: userId, emoji });
+    }
+
+    await message.save();
+
+    io.emit("message-reacted", {
+      msgId,
+      reactions: message.reactions
+    });
   });
 
   // ================= TYPING =================
