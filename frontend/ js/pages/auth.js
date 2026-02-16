@@ -1,48 +1,44 @@
-// js/pages/settings.js
+// js/pages/auth.js
 (function () {
   if (!window.App || !App.api || !App.state) {
     console.error("Core missing");
     return;
   }
 
-  const saveProfileBtn = document.getElementById("saveProfile");
-  const saveLanguageBtn = document.getElementById("saveLanguage");
-  const logoutBtn = document.getElementById("logout");
+  const loginForm = document.getElementById("loginForm");
+  const signupForm = document.getElementById("signupForm");
 
-  saveProfileBtn?.addEventListener("click", async () => {
-    const name = document.getElementById("name").value;
-    try {
-      await App.api.request("/user/profile", {
-        method: "PUT",
-        body: { name }
-      });
-      alert("Profile updated");
-    } catch {
-      alert("Profile update failed");
-    }
-  });
+  if (loginForm) {
+    loginForm.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const email = loginForm.querySelector('input[type="email"]').value;
+      const password = loginForm.querySelector('input[type="password"]').value;
 
-  saveLanguageBtn?.addEventListener("click", async () => {
-    const lang = document.getElementById("language").value;
-    try {
-      await App.api.request("/user/settings", {
-        method: "PUT",
-        body: { language: lang }
-      });
-      alert("Language saved");
-    } catch {
-      alert("Failed to save language");
-    }
-  });
-
-  logoutBtn?.addEventListener("click", async () => {
-    await App.api.logout();
-    App.state.replaceState({
-      currentUser: null,
-      chats: {},
-      messages: {},
-      ui: {}
+      try {
+        const res = await App.api.login(email, password);
+        if (res.user) App.state.setState({ currentUser: res.user });
+        window.location.href = "chat.html";
+      } catch (err) {
+        alert(err.message || "Login failed");
+      }
     });
-    window.location.href = "index.html";
-  });
+  }
+
+  if (signupForm) {
+    signupForm.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const inputs = signupForm.querySelectorAll("input");
+      const name = inputs[0].value;
+      const email = inputs[1].value;
+      const password = inputs[2].value;
+
+      try {
+        const res = await App.api.signup(name, email, password);
+        if (res.user) App.state.setState({ currentUser: res.user });
+        window.location.href = "chat.html";
+      } catch (err) {
+        alert(err.message || "Signup failed");
+      }
+    });
+  }
 })();
