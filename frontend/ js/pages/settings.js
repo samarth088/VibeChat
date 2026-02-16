@@ -1,23 +1,48 @@
-// =============================
-// Settings Page Logic
-// =============================
-
-if (!State.currentUser) {
-  window.location.href = "index.html";
+// js/pages/settings.js
+(function () {
+  if (!window.App || !App.api || !App.state) {
+    console.error("Core missing");
+    return;
   }
 
-  const themeSelect = document.getElementById("themeSelect");
-  const saveBtn = document.getElementById("saveSettings");
+  const saveProfileBtn = document.getElementById("saveProfile");
+  const saveLanguageBtn = document.getElementById("saveLanguage");
+  const logoutBtn = document.getElementById("logout");
 
-  if (themeSelect) {
-    themeSelect.value = localStorage.getItem("theme") || "light";
+  saveProfileBtn?.addEventListener("click", async () => {
+    const name = document.getElementById("name").value;
+    try {
+      await App.api.request("/user/profile", {
+        method: "PUT",
+        body: { name }
+      });
+      alert("Profile updated");
+    } catch {
+      alert("Profile update failed");
     }
+  });
 
-    if (saveBtn) {
-      saveBtn.onclick = () => {
-          const theme = themeSelect.value;
-              document.body.className = theme;
-                  localStorage.setItem("theme", theme);
-                      alert("Theme updated");
-                        };
-                        }
+  saveLanguageBtn?.addEventListener("click", async () => {
+    const lang = document.getElementById("language").value;
+    try {
+      await App.api.request("/user/settings", {
+        method: "PUT",
+        body: { language: lang }
+      });
+      alert("Language saved");
+    } catch {
+      alert("Failed to save language");
+    }
+  });
+
+  logoutBtn?.addEventListener("click", async () => {
+    await App.api.logout();
+    App.state.replaceState({
+      currentUser: null,
+      chats: {},
+      messages: {},
+      ui: {}
+    });
+    window.location.href = "index.html";
+  });
+})();
