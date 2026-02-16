@@ -19,11 +19,6 @@ const messageSchema = new mongoose.Schema(
       ref: "User"
     },
 
-    group: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "Group"
-    },
-
     content: {
       type: String,
       required: true
@@ -35,7 +30,7 @@ const messageSchema = new mongoose.Schema(
       default: "text"
     },
 
-    // ================= STATUS SYSTEM =================
+    // ===== STATUS SYSTEM =====
     status: {
       type: String,
       enum: ["sent", "delivered", "seen"],
@@ -52,7 +47,7 @@ const messageSchema = new mongoose.Schema(
       default: null
     },
 
-    // ================= EDIT SYSTEM =================
+    // ===== EDIT SYSTEM =====
     isEdited: {
       type: Boolean,
       default: false
@@ -63,7 +58,7 @@ const messageSchema = new mongoose.Schema(
       default: null
     },
 
-    // ================= DELETE SYSTEM =================
+    // ===== DELETE SYSTEM =====
     isDeletedForEveryone: {
       type: Boolean,
       default: false
@@ -76,7 +71,7 @@ const messageSchema = new mongoose.Schema(
       }
     ],
 
-    // ================= REACTION SYSTEM =================
+    // ===== REACTION SYSTEM =====
     reactions: [
       {
         user: {
@@ -87,12 +82,10 @@ const messageSchema = new mongoose.Schema(
       }
     ]
   },
-  {
-    timestamps: true
-  }
+  { timestamps: true }
 );
 
-// ================= INDEXES =================
+// ===== INDEXES =====
 messageSchema.index({ chat: 1, createdAt: -1 });
 messageSchema.index({ sender: 1 });
 messageSchema.index({ receiver: 1 });
