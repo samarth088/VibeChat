@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>VibeChat | Login</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+
+  <link rel="stylesheet" href="css/base.css" />
+  <link rel="stylesheet" href="css/components.css" />
+  <!-- FIX: correct path — was css/auth.css, must be css/pages/auth.css -->
+  <link rel="stylesheet" href="css/pages/auth.css" />
+</head>
+<body>
+
+  <main class="auth-screen">
+    <div class="auth-card">
+
+      <div class="auth-brand">
+        <img src="assets/images/vibechat-logo.png" alt="VibeChat logo" />
+        <h1>VibeChat</h1>
+        <p>Connect. Chat. Vibe.</p>
+      </div>
+
+      <form id="loginForm" autocomplete="on">
+
+        <label class="field">
+          <span class="label-text">ID / Phone / Username</span>
+          <input
+            type="text"
+            name="identifier"
+            placeholder="Enter ID, phone or username"
+            required
+            autocomplete="username"
+          />
+        </label>
+
+        <label class="field">
+          <span class="label-text">Password</span>
+          <input
+            type="password"
+            name="password"
+            placeholder="Enter password"
+            required
+            autocomplete="current-password"
+          />
+        </label>
+
+        <!-- Error message box -->
+        <p class="field-error hidden" id="loginError"></p>
+
+        <button type="submit" class="btn-primary">Sign in</button>
+
+      </form>
+
+      <small class="auth-footer">
+        Search by ID or username inside the app.
+      </small>
+
+    </div>
+  </main>
+
+  <!--
+    Load order:
+    1. env.js  — window.ENV (DEV_MODE flag, API_URL)
+    2. state.js — window.VibeState (formatId, saveSession)
+    3. api.js  — window.VibeAPI (login mock/real)
+    4. login.js — form handler (uses VibeState + VibeAPI)
+
+    login.js is type="module" to scope its own variables cleanly.
+    VibeState and VibeAPI are on window so they're accessible from module scope.
+  -->
+  <script src="config/env.js"></script>
+  <script src="js/core/state.js"></script>
+  <script src="js/core/api.js"></script>
+  <script type="module" src="js/pages/login.js"></script>
+
+</body>
+</html>
