@@ -14,7 +14,7 @@ exports.sendOtp = async (req, res, next) => {
       return res.status(400).json({ error: "Email required" });
     }
 
-    // Remove old OTP if exists
+    // Remove old OTP
     await Otp.deleteOne({ email });
 
     const otp = generateOTP();
@@ -42,10 +42,10 @@ exports.sendOtp = async (req, res, next) => {
   }
 };
 
-// ================= VERIFY OTP =================
-exports.verifyOtp = async (req, res, next) => {
+// ================= VERIFY OTP + SIGNUP =================
+exports.verifyOtpAndSignup = async (req, res, next) => {
   try {
-    const { email, otp } = req.body;
+    const { email, otp, username, password } = req.body;
 
     const record = await Otp.findOne({ email, otp });
 
@@ -53,27 +53,8 @@ exports.verifyOtp = async (req, res, next) => {
       return res.status(400).json({ error: "Invalid or expired OTP" });
     }
 
-    // Delete OTP after verification
+    // OTP verified → delete
     await Otp.deleteOne({ email });
-
-    res.json({ message: "OTP verified successfully" });
-
-  } catch (err) {
-    next(err);
-  }
-};
-
-// ================= REGISTER =================
-exports.register = async (req, res, next) => {
-  try {
-    const { username, password, email } = req.body;
-
-    // 🔥 OTP check mandatory
-    const otpRecord = await Otp.findOne({ email });
-
-    if (otpRecord) {
-      return res.status(400).json({ error: "Please verify OTP before registering" });
-    }
 
     const exists = await User.findOne({ username });
     if (exists) {
@@ -91,11 +72,9 @@ exports.register = async (req, res, next) => {
     const token = generateToken(user._id);
 
     res.status(201).json({
-      token,
-      user: {
-        id: user._id,
-        username: user.username
-      }
+      userId: user._id,
+      username: user.username,
+      token
     });
 
   } catch (err) {
@@ -121,11 +100,9 @@ exports.login = async (req, res, next) => {
     const token = generateToken(user._id);
 
     res.json({
-      token,
-      user: {
-        id: user._id,
-        username: user.username
-      }
+      userId: user._id,
+      username: user.username,
+      token
     });
 
   } catch (err) {
