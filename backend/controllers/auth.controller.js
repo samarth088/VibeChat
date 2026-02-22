@@ -14,7 +14,6 @@ exports.sendOtp = async (req, res, next) => {
       return res.status(400).json({ error: "Email required" });
     }
 
-    // Remove old OTP
     await Otp.deleteOne({ email });
 
     const otp = generateOTP();
@@ -47,29 +46,24 @@ exports.verifyOtpAndSignup = async (req, res, next) => {
   try {
     const { email, otp, username, password } = req.body;
 
-    // 1️⃣ Check OTP
     const record = await Otp.findOne({ email, otp });
 
     if (!record) {
       return res.status(400).json({ error: "Invalid or expired OTP" });
     }
 
-    // 2️⃣ Delete OTP after verification
     await Otp.deleteOne({ email });
 
-    // 3️⃣ Check if email already exists
     const emailExists = await User.findOne({ email });
     if (emailExists) {
       return res.status(400).json({ error: "Email already registered" });
     }
 
-    // 4️⃣ Check if username exists
     const usernameExists = await User.findOne({ username });
     if (usernameExists) {
       return res.status(400).json({ error: "Username already taken" });
     }
 
-    // 5️⃣ Create user
     const hashed = await bcrypt.hash(password, 10);
 
     const user = await User.create({
@@ -81,11 +75,12 @@ exports.verifyOtpAndSignup = async (req, res, next) => {
     const token = generateToken(user._id);
 
     res.status(201).json({
-      user: {
-        id: user._id,
-        username: user.username
-      },
-      token
+      userId: user._id,
+      username: user.username,
+      token,
+      profile: {
+        bio: "🚀 Living on vibes. Connect with me on VibeChat!"
+      }
     });
 
   } catch (err) {
@@ -111,11 +106,12 @@ exports.login = async (req, res, next) => {
     const token = generateToken(user._id);
 
     res.json({
-      user: {
-        id: user._id,
-        username: user.username
-      },
-      token
+      userId: user._id,
+      username: user.username,
+      token,
+      profile: {
+        bio: "🚀 Living on vibes. Connect with me on VibeChat!"
+      }
     });
 
   } catch (err) {
