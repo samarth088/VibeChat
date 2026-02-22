@@ -4,98 +4,51 @@
   <meta charset="utf-8" />
   <title>VibeChat | Sign Up</title>
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-
   <link rel="stylesheet" href="css/base.css" />
   <link rel="stylesheet" href="css/components.css" />
   <link rel="stylesheet" href="css/pages/auth.css" />
 </head>
 <body>
-
   <main class="auth-screen">
     <div class="auth-card">
-
       <div class="auth-brand">
         <img src="assets/images/vibechat-logo.png" alt="VibeChat logo" />
         <h1>VibeChat</h1>
         <p>Create your account. Start vibing.</p>
       </div>
-
       <form id="signupForm" autocomplete="off">
-
         <label class="field">
           <span class="label-text">Full Name</span>
-          <input
-            type="text"
-            name="fullname"
-            placeholder="Enter your full name"
-            required
-            autocomplete="name"
-          />
+          <input type="text" name="fullname" placeholder="Enter your full name" required autocomplete="name" />
         </label>
-
         <label class="field">
           <span class="label-text">Username</span>
-          <input
-            type="text"
-            name="username"
-            placeholder="e.g. cool_viber (3–20 chars)"
-            required
-            autocomplete="off"
-          />
+          <input type="text" name="username" placeholder="e.g. cool_viber (3-20 chars)" required autocomplete="off" />
         </label>
-
         <label class="field">
           <span class="label-text">Phone / Email</span>
-          <input
-            type="text"
-            name="contact"
-            placeholder="Phone number or email"
-            required
-            autocomplete="off"
-          />
+          <input type="text" name="contact" placeholder="Phone number or email" required autocomplete="off" />
         </label>
-
         <label class="field">
           <span class="label-text">Password</span>
-          <input
-            type="password"
-            name="password"
-            placeholder="Min. 6 characters"
-            required
-            autocomplete="new-password"
-          />
+          <input type="password" name="password" placeholder="Min. 6 characters" required autocomplete="new-password" />
         </label>
-
         <label class="field">
           <span class="label-text">Confirm Password</span>
-          <input
-            type="password"
-            name="confirmPassword"
-            placeholder="Repeat your password"
-            required
-            autocomplete="new-password"
-          />
+          <input type="password" name="confirmPassword" placeholder="Repeat your password" required autocomplete="new-password" />
         </label>
-
-        <!-- Error / Success -->
         <p class="field-error hidden" id="signupError"></p>
         <p class="field-success hidden" id="signupSuccess"></p>
-
         <button type="submit" class="btn-primary">Create Account</button>
-
       </form>
-
       <small class="auth-footer">
         Already have an account? <a href="index.html" class="auth-link">Sign in</a>
       </small>
-
     </div>
   </main>
-
   <script src="config/env.js"></script>
   <script src="js/core/state.js"></script>
   <script src="js/core/api.js"></script>
-  <script type="module" src="js/pages/signup.js"></script>
-
+  <script src="js/pages/signup.js"></script>
 </body>
 </html>
