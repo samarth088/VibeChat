@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>VibeChat | Create Account</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+
+  <link rel="stylesheet" href="css/base.css" />
+  <link rel="stylesheet" href="css/components.css" />
+  <link rel="stylesheet" href="css/pages/auth.css" />
+</head>
+<body>
+
+<main class="auth-screen">
+  <div class="auth-card">
+
+    <div class="auth-brand">
+      <img src="assets/images/vibechat-logo.png" alt="VibeChat logo" />
+      <h1>Create Account</h1>
+      <p>Email verification required</p>
+    </div>
+
+    <form id="signupForm">
+
+      <!-- EMAIL -->
+      <label class="field">
+        <span class="label-text">Email</span>
+        <input type="email" id="email" required />
+      </label>
+
+      <button type="button" class="btn-secondary" id="sendOtpBtn">
+        Send OTP
+      </button>
+
+      <!-- OTP -->
+      <div id="otpSection" class="hidden">
+        <label class="field">
+          <span class="label-text">Enter OTP</span>
+          <input type="text" id="otp" maxlength="6" />
+        </label>
+
+        <button type="button" class="btn-secondary" id="verifyOtpBtn">
+          Verify OTP
+        </button>
+      </div>
+
+      <!-- USERNAME -->
+      <label class="field">
+        <span class="label-text">Username</span>
+        <input type="text" id="username" required />
+      </label>
+
+      <!-- PASSWORD -->
+      <label class="field">
+        <span class="label-text">Password</span>
+        <input type="password" id="password" required />
+      </label>
+
+      <p class="field-error hidden" id="signupError"></p>
+
+      <button type="submit" class="btn-primary" id="registerBtn" disabled>
+        Create Account
+      </button>
+
+    </form>
+
+    <small class="auth-footer">
+      Already have an account?
+      <a href="index.html">Sign in</a>
+    </small>
+
+  </div>
+</main>
+
+<script src="config/env.js"></script>
+<script src="js/core/api.js"></script>
+<script type="module" src="js/pages/signup.js"></script>
+
+</body>
+  </html>
