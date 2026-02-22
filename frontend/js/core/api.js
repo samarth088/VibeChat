@@ -36,6 +36,32 @@
       });
     },
 
+    // signup({ fullname, username, contact, password }) => session object
+    signup: function ({ fullname, username, contact, password }) {
+      if (cfg.DEV_MODE) {
+        return new Promise(function (resolve, reject) {
+          setTimeout(function () {
+            if (username.toLowerCase() === 'taken') {
+              return reject(new Error('Username already taken. Try another.'));
+            }
+            const userId = Math.floor(Math.random() * 90000) + 1;
+            resolve({
+              userId:      userId,
+              idFormatted: window.VibeState.formatId(userId),
+              username:    username,
+              token:       'dev-token-' + userId,
+              profile:     { bio: '🚀 Living on vibes. Connect with me on VibeChat!' }
+            });
+          }, 800);
+        });
+      }
+      return fetchJSON(cfg.API_URL + '/auth/signup', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ fullname, username, contact, password })
+      });
+    },
+
     // searchUsers(query) => [{ userId, idFormatted, username, online }]
     searchUsers: function (query) {
       if (!query) return Promise.resolve([]);
