@@ -32,8 +32,8 @@
         </label>
 
         <label class="field">
-          <span class="label-text">Phone Number</span>
-          <input type="tel" name="phone" placeholder="+91 98765 43210" required autocomplete="tel" />
+          <span class="label-text">Email Address</span>
+          <input type="email" name="email" placeholder="Enter your email address" required autocomplete="email" />
         </label>
 
         <label class="field">
@@ -55,9 +55,9 @@
       <!-- STEP 2: OTP -->
       <div id="otpPhase" class="hidden">
         <div class="otp-info">
-          <div class="otp-icon">📱</div>
-          <p class="otp-sent-text">OTP sent to <span id="otpPhoneDisplay"></span></p>
-          <p class="otp-sub">Enter the 6-digit code below</p>
+          <div class="otp-icon">📧</div>
+          <p class="otp-sent-text">OTP sent to <span id="otpEmailDisplay"></span></p>
+          <p class="otp-sub">Enter the 6-digit code sent to your email</p>
         </div>
 
         <div class="otp-boxes" id="otpBoxes">
@@ -82,14 +82,13 @@
         <button class="btn-link-gray" id="backBtn">← Change details</button>
       </div>
 
-      <small class="auth-footer" id="authFooter">
+      <small class="auth-footer">
         Already have an account? <a href="index.html" class="auth-link">Sign in</a>
       </small>
 
     </div>
   </main>
 
-  <!-- Load order is critical -->
   <script src="config/env.js"></script>
   <script src="js/core/state.js"></script>
   <script src="js/core/api.js"></script>
