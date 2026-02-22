@@ -23,13 +23,13 @@ document.addEventListener('DOMContentLoaded', function () {
     if (!fullname) {
       return showError('Please enter your full name.');
     }
-    if (!isValidUsername(username)) {
+    if (!/^[a-zA-Z0-9_]{3,20}$/.test(username)) {
       return showError('Username must be 3–20 chars: letters, numbers, underscore only.');
     }
     if (!contact) {
       return showError('Please enter your phone number or email.');
     }
-    if (!isValidPassword(password)) {
+    if (password.length < 6) {
       return showError('Password must be at least 6 characters.');
     }
     if (password !== confirmPassword) {
