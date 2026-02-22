@@ -1,0 +1,194 @@
+/* =============================================
+   layout.css — Header, Bottom Nav, Sheets, Search Bar, Brand Logo
+   ============================================= */
+
+/* ── Header ── */
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 20px;
+}
+
+.header-btn {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.07);
+  border: 1px solid rgba(255,255,255,0.1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: rgba(255,255,255,0.8);
+  font-size: 18px;
+  transition: background 0.2s;
+}
+.header-btn:hover { background: rgba(0,120,255,0.2); }
+
+.header-icons {
+  display: flex;
+  gap: 10px;
+}
+
+/* ── Brand logo ── */
+
+.brand-logo {
+  position: absolute;
+  top: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 50;
+  width: 90px;
+}
+.brand-logo img {
+  width: 100%;
+  height: auto;
+  display: block;
+  opacity: 0.98;
+  filter: drop-shadow(0 0 10px rgba(0,140,255,0.7)) drop-shadow(0 0 20px rgba(0,80,200,0.45));
+}
+
+/* ── Search bar ── */
+
+.search-bar-wrap {
+  padding: 8px 20px 14px;
+}
+.search-bar {
+  display: flex;
+  align-items: center;
+  background: rgba(0,60,140,0.35);
+  border: 1.5px solid rgba(0,120,255,0.5);
+  border-radius: 30px;
+  padding: 10px 8px 10px 16px;
+  box-shadow: 0 0 18px rgba(0,100,255,0.2), inset 0 0 10px rgba(0,60,180,0.1);
+  gap: 10px;
+}
+.search-bar svg {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+}
+.search-bar input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  outline: none;
+  color: rgba(255,255,255,0.5);
+  font-size: 14px;
+  caret-color: #4db8ff;
+  cursor: pointer;
+}
+.search-bar input::placeholder { color: rgba(255,255,255,0.35); }
+.search-bar .btn-new {
+  padding: 6px 14px;
+  border-radius: 20px;
+  font-size: 13px;
+}
+
+/* ── Bottom nav ── */
+
+.bottom-nav {
+  display: flex;
+  border-top: 1px solid rgba(0,80,180,0.3);
+  background: rgba(0,10,30,0.8);
+  backdrop-filter: blur(20px);
+  flex-shrink: 0;
+}
+
+.nav-tab {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 12px 8px 20px;
+  cursor: pointer;
+  color: rgba(255,255,255,0.4);
+  font-size: 12px;
+  font-weight: 500;
+  gap: 4px;
+  transition: color 0.2s;
+  position: relative;
+}
+.nav-tab.active { color: #4db8ff; }
+.nav-tab.active::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 60%;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, #4db8ff, transparent);
+  border-radius: 2px;
+}
+.nav-tab svg { width: 24px; height: 24px; }
+.nav-tab.active svg { filter: drop-shadow(0 0 6px rgba(0,160,255,0.6)); }
+
+/* Glow above nav */
+.nav-glow {
+  height: 1px;
+  background: linear-gradient(90deg, transparent 10%, rgba(0,150,255,0.6) 50%, transparent 90%);
+  box-shadow: 0 0 15px rgba(0,150,255,0.4);
+  flex-shrink: 0;
+}
+
+/* ── Sheet overlays ──
+   FIX: use .active class with display:flex (not inline style:display:block)
+   overlays.js now uses classList.add/remove('active') to match this
+── */
+
+.sheet-overlay {
+  display: none;
+  position: absolute;
+  inset: 0;
+  background: rgba(0,5,20,0.85);
+  z-index: 100;
+  flex-direction: column;
+  justify-content: flex-end;
+}
+.sheet-overlay.active {
+  display: flex;
+}
+
+.sheet {
+  background: linear-gradient(160deg, #00102e, #000a20);
+  border-radius: 24px 24px 0 0;
+  border-top: 1px solid rgba(0,100,255,0.3);
+  padding: 20px;
+  max-height: 80%;
+  overflow-y: auto;
+}
+
+.sheet-handle {
+  width: 40px;
+  height: 4px;
+  background: rgba(255,255,255,0.2);
+  border-radius: 2px;
+  margin: 0 auto 20px;
+}
+
+.sheet-title {
+  color: white;
+  font-size: 18px;
+  font-weight: 700;
+  margin-bottom: 20px;
+  text-align: center;
+}
+
+/* ── Content panels (DM / Group / Calls)
+   FIX: use .active instead of bottomNav.js injecting display:block
+   DM list is flex-col, group/calls are also flex-col centered
+── */
+
+#dmContent {
+  display: none;
+  flex: 1;
+  flex-direction: column;
+  overflow-y: auto;
+  padding: 0 10px;
+}
+#dmContent.active { display: flex; }
+#dmContent::-webkit-scrollbar { width: 0; }
