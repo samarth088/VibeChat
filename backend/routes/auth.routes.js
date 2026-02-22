@@ -2,24 +2,22 @@ const express = require("express");
 const router = express.Router();
 
 const {
-  register,
-  login,
   sendOtp,
-  verifyOtp
+  verifyOtpAndSignup,
+  login
 } = require("../controllers/auth.controller");
 
-// ================= OTP ROUTES =================
+// ================= OTP =================
 
+// Send OTP
 // POST /api/auth/send-otp
 router.post("/send-otp", sendOtp);
 
-// POST /api/auth/verify-otp
-router.post("/verify-otp", verifyOtp);
+// Verify OTP + Create Account
+// POST /api/auth/verify-otp-signup
+router.post("/verify-otp-signup", verifyOtpAndSignup);
 
-// ================= AUTH ROUTES =================
-
-// POST /api/auth/register
-router.post("/register", register);
+// ================= LOGIN =================
 
 // POST /api/auth/login
 router.post("/login", login);
