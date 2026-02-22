@@ -91,12 +91,13 @@ document.addEventListener('DOMContentLoaded', function () {
         password: pendingData.password
       });
 
+      // ✅ FIXED SESSION BLOCK
       var session = {
-        userId:      response.user.id,
-        idFormatted: window.VibeState.formatId(response.user.id),
-        username:    response.user.username,
+        userId:      response.userId,
+        idFormatted: window.VibeState.formatId(response.userId),
+        username:    response.username,
         token:       response.token,
-        profile:     {}
+        profile:     response.profile || {}
       };
 
       window.VibeState.saveSession(session);
