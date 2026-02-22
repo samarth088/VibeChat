@@ -30,7 +30,7 @@ document.addEventListener('DOMContentLoaded', function () {
       showError('Please fill in all fields.');
       return;
     }
-    if (!isValidPassword(password)) {
+    if (password.length < 6) {
       showError('Password must be at least 6 characters.');
       return;
     }
