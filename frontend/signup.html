@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <title>VibeChat | Create Account</title>
+  <title>VibeChat | Sign Up</title>
   <meta name="viewport" content="width=device-width,initial-scale=1" />
 
   <link rel="stylesheet" href="css/base.css" />
@@ -11,70 +11,91 @@
 </head>
 <body>
 
-<main class="auth-screen">
-  <div class="auth-card">
+  <main class="auth-screen">
+    <div class="auth-card">
 
-    <div class="auth-brand">
-      <img src="assets/images/vibechat-logo.png" alt="VibeChat logo" />
-      <h1>Create Account</h1>
-      <p>Email verification required</p>
-    </div>
-
-    <form id="signupForm">
-
-      <!-- EMAIL -->
-      <label class="field">
-        <span class="label-text">Email</span>
-        <input type="email" id="email" required />
-      </label>
-
-      <button type="button" class="btn-secondary" id="sendOtpBtn">
-        Send OTP
-      </button>
-
-      <!-- OTP -->
-      <div id="otpSection" class="hidden">
-        <label class="field">
-          <span class="label-text">Enter OTP</span>
-          <input type="text" id="otp" maxlength="6" />
-        </label>
-
-        <button type="button" class="btn-secondary" id="verifyOtpBtn">
-          Verify OTP
-        </button>
+      <div class="auth-brand">
+        <img src="assets/images/vibechat-logo.png" alt="VibeChat logo" />
+        <h1>VibeChat</h1>
+        <p>Create your account. Start vibing.</p>
       </div>
 
-      <!-- USERNAME -->
-      <label class="field">
-        <span class="label-text">Username</span>
-        <input type="text" id="username" required />
-      </label>
+      <form id="signupForm" autocomplete="off">
 
-      <!-- PASSWORD -->
-      <label class="field">
-        <span class="label-text">Password</span>
-        <input type="password" id="password" required />
-      </label>
+        <label class="field">
+          <span class="label-text">Full Name</span>
+          <input
+            type="text"
+            name="fullname"
+            placeholder="Enter your full name"
+            required
+            autocomplete="name"
+          />
+        </label>
 
-      <p class="field-error hidden" id="signupError"></p>
+        <label class="field">
+          <span class="label-text">Username</span>
+          <input
+            type="text"
+            name="username"
+            placeholder="e.g. cool_viber (3–20 chars)"
+            required
+            autocomplete="off"
+          />
+        </label>
 
-      <button type="submit" class="btn-primary" id="registerBtn" disabled>
-        Create Account
-      </button>
+        <label class="field">
+          <span class="label-text">Phone / Email</span>
+          <input
+            type="text"
+            name="contact"
+            placeholder="Phone number or email"
+            required
+            autocomplete="off"
+          />
+        </label>
 
-    </form>
+        <label class="field">
+          <span class="label-text">Password</span>
+          <input
+            type="password"
+            name="password"
+            placeholder="Min. 6 characters"
+            required
+            autocomplete="new-password"
+          />
+        </label>
 
-    <small class="auth-footer">
-      Already have an account?
-      <a href="index.html">Sign in</a>
-    </small>
+        <label class="field">
+          <span class="label-text">Confirm Password</span>
+          <input
+            type="password"
+            name="confirmPassword"
+            placeholder="Repeat your password"
+            required
+            autocomplete="new-password"
+          />
+        </label>
 
-  </div>
-</main>
+        <!-- Error / Success -->
+        <p class="field-error hidden" id="signupError"></p>
+        <p class="field-success hidden" id="signupSuccess"></p>
 
-<script src="config/env.js"></script>
-<script src="js/core/api.js"></script>
-<script type="module" src="js/pages/signup.js"></script>
+        <button type="submit" class="btn-primary">Create Account</button>
+
+      </form>
+
+      <small class="auth-footer">
+        Already have an account? <a href="index.html" class="auth-link">Sign in</a>
+      </small>
+
+    </div>
+  </main>
+
+  <script src="config/env.js"></script>
+  <script src="js/core/state.js"></script>
+  <script src="js/core/api.js"></script>
+  <script type="module" src="js/pages/signup.js"></script>
 
 </body>
-  </html>
+</html>
