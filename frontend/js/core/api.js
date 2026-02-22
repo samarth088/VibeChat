@@ -6,18 +6,27 @@
   var cfg = window.ENV || { DEV_MODE: true, API_URL: '' };
 
   function fetchJSON(url, opts) {
-    return fetch(url, opts).then(function (res) {
-      if (!res.ok) throw new Error('HTTP ' + res.status);
-      return res.json();
+    return fetch(url, opts).then(async function (res) {
+      var data = {};
+      try {
+        data = await res.json();
+      } catch (e) {}
+
+      if (!res.ok) {
+        throw new Error(data.error || ('HTTP ' + res.status));
+      }
+
+      return data;
     });
   }
 
   window.VibeAPI = {
 
-    // ── login ─────────────────────────────────────────────────
+    // ── LOGIN ─────────────────────────────────────────────────
     login: function (data) {
       var identifier = data.identifier;
       var password   = data.password;
+
       if (cfg.DEV_MODE) {
         return new Promise(function (resolve) {
           setTimeout(function () {
@@ -32,32 +41,35 @@
           }, 600);
         });
       }
+
       return fetchJSON(cfg.API_URL + '/auth/login', {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify({ identifier: identifier, password: password })
+        body:    JSON.stringify({ username: identifier, password: password })
       });
     },
 
-    // ── sendOTP ───────────────────────────────────────────────
-    sendOTP: function (phone) {
+    // ── SEND OTP (EMAIL FIXED) ───────────────────────────────
+    sendOTP: function (email) {
       if (cfg.DEV_MODE) {
         return new Promise(function (resolve) {
           setTimeout(function () {
-            console.log('[DEV] OTP sent to', phone, '— use 123456 to verify');
+            console.log('[DEV] OTP sent to', email, '— use 123456 to verify');
             resolve({ success: true });
           }, 800);
         });
       }
+
       return fetchJSON(cfg.API_URL + '/auth/send-otp', {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify({ phone: phone })
+        body:    JSON.stringify({ email: email }) // ✅ FIXED
       });
     },
 
-    // ── verifyOTPAndSignup ────────────────────────────────────
-    verifyOTPAndSignup: function (data) {
+    // ── VERIFY OTP + SIGNUP (CORRECT BACKEND FLOW) ───────────
+    verifyOTPAndSignup: async function (data) {
+
       if (cfg.DEV_MODE) {
         return new Promise(function (resolve, reject) {
           setTimeout(function () {
@@ -67,7 +79,9 @@
             if ((data.username || '').toLowerCase() === 'taken') {
               return reject(new Error('Username already taken.'));
             }
+
             var userId = Math.floor(Math.random() * 90000) + 1;
+
             resolve({
               userId:      userId,
               idFormatted: window.VibeState.formatId(userId),
@@ -78,17 +92,35 @@
           }, 700);
         });
       }
-      return fetchJSON(cfg.API_URL + '/auth/verify-otp-signup', {
+
+      // 1️⃣ Verify OTP
+      await fetchJSON(cfg.API_URL + '/auth/verify-otp', {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify(data)
+        body:    JSON.stringify({
+          email: data.email,
+          otp:   data.otp
+        })
+      });
+
+      // 2️⃣ Register user
+      return fetchJSON(cfg.API_URL + '/auth/register', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({
+          username: data.username,
+          email:    data.email,
+          password: data.password
+        })
       });
     },
 
-    // ── searchUsers ───────────────────────────────────────────
+    // ── SEARCH USERS ──────────────────────────────────────────
     searchUsers: function (query) {
       if (!query) return Promise.resolve([]);
+
       var q = String(query).trim();
+
       if (cfg.DEV_MODE) {
         if (q.startsWith('#')) {
           var num = parseInt(q.replace('#', ''), 10) || Math.floor(Math.random() * 90000) + 1;
@@ -99,6 +131,7 @@
             online:      Math.random() > 0.5
           }]);
         }
+
         return Promise.resolve([1, 2, 3].map(function (i) {
           var id = Math.floor(Math.random() * 90000) + 1;
           return {
@@ -109,10 +142,11 @@
           };
         }));
       }
+
       return fetchJSON(cfg.API_URL + '/users/search?q=' + encodeURIComponent(q));
     },
 
-    // ── getUserById ───────────────────────────────────────────
+    // ── GET USER BY ID ────────────────────────────────────────
     getUserById: function (userId) {
       if (cfg.DEV_MODE) {
         return Promise.resolve({
@@ -122,10 +156,11 @@
           bio:         'Dev user'
         });
       }
+
       return fetchJSON(cfg.API_URL + '/users/' + encodeURIComponent(userId));
     },
 
-    // ── openChatWith ──────────────────────────────────────────
+    // ── OPEN CHAT ─────────────────────────────────────────────
     openChatWith: function (userId, token) {
       if (cfg.DEV_MODE) {
         return Promise.resolve({
@@ -133,6 +168,7 @@
           participants: [userId]
         });
       }
+
       return fetchJSON(cfg.API_URL + '/chats/open', {
         method:  'POST',
         headers: {
