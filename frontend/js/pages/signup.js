@@ -1,103 +1,96 @@
-import { ENV } from "../../config/env.js";
+// js/pages/signup.js
+// Signup page logic — ES module (type="module")
 
-const emailInput = document.getElementById("email");
-const otpInput = document.getElementById("otp");
-const usernameInput = document.getElementById("username");
-const passwordInput = document.getElementById("password");
+document.addEventListener('DOMContentLoaded', function () {
+  const form         = document.getElementById('signupForm');
+  const errorBox     = document.getElementById('signupError');
+  const successBox   = document.getElementById('signupSuccess');
+  const submitBtn    = form.querySelector('button[type="submit"]');
 
-const sendOtpBtn = document.getElementById("sendOtpBtn");
-const verifyOtpBtn = document.getElementById("verifyOtpBtn");
-const registerBtn = document.getElementById("registerBtn");
+  form.addEventListener('submit', async function (e) {
+    e.preventDefault();
 
-const otpSection = document.getElementById("otpSection");
-const signupError = document.getElementById("signupError");
+    hideMessages();
 
-let otpVerified = false;
+    const formData        = new FormData(form);
+    const fullname        = (formData.get('fullname')        || '').trim();
+    const username        = (formData.get('username')        || '').trim();
+    const contact         = (formData.get('contact')         || '').trim();
+    const password        = (formData.get('password')        || '');
+    const confirmPassword = (formData.get('confirmPassword') || '');
 
-// ================= SEND OTP =================
-sendOtpBtn.addEventListener("click", async () => {
-
-  const email = emailInput.value.trim();
-  if (!email) return alert("Enter email first");
-
-  try {
-    const res = await fetch(`${ENV.API_BASE}/auth/send-otp`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email })
-    });
-
-    const data = await res.json();
-    if (data.error) return alert(data.error);
-
-    alert("OTP sent to email");
-    otpSection.classList.remove("hidden");
-
-  } catch (err) {
-    alert("Failed to send OTP");
-  }
-
-});
-
-// ================= VERIFY OTP =================
-verifyOtpBtn.addEventListener("click", async () => {
-
-  const email = emailInput.value.trim();
-  const otp = otpInput.value.trim();
-
-  if (!otp) return alert("Enter OTP");
-
-  try {
-    const res = await fetch(`${ENV.API_BASE}/auth/verify-otp`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email, otp })
-    });
-
-    const data = await res.json();
-    if (data.error) return alert(data.error);
-
-    alert("OTP Verified ✅");
-    otpVerified = true;
-    registerBtn.disabled = false;
-
-  } catch (err) {
-    alert("Verification failed");
-  }
-
-});
-
-// ================= REGISTER =================
-document.getElementById("signupForm").addEventListener("submit", async (e) => {
-  e.preventDefault();
-
-  if (!otpVerified) {
-    return alert("Verify OTP first");
-  }
-
-  const email = emailInput.value.trim();
-  const username = usernameInput.value.trim();
-  const password = passwordInput.value.trim();
-
-  try {
-    const res = await fetch(`${ENV.API_BASE}/auth/register`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email, username, password })
-    });
-
-    const data = await res.json();
-
-    if (data.error) {
-      signupError.textContent = data.error;
-      signupError.classList.remove("hidden");
-      return;
+    // ── Validation ──────────────────────────────────────────────
+    if (!fullname) {
+      return showError('Please enter your full name.');
+    }
+    if (!isValidUsername(username)) {
+      return showError('Username must be 3–20 chars: letters, numbers, underscore only.');
+    }
+    if (!contact) {
+      return showError('Please enter your phone number or email.');
+    }
+    if (!isValidPassword(password)) {
+      return showError('Password must be at least 6 characters.');
+    }
+    if (password !== confirmPassword) {
+      return showError('Passwords do not match.');
     }
 
-    alert("Account created successfully 🎉");
-    window.location.href = "index.html";
+    setLoading(true);
 
-  } catch (err) {
-    alert("Registration failed");
+    try {
+      const response = await window.VibeAPI.signup({
+        fullname,
+        username,
+        contact,
+        password
+      });
+
+      const session = {
+        userId:      response.userId,
+        idFormatted: response.idFormatted || window.VibeState.formatId(response.userId),
+        username:    response.username || username,
+        token:       response.token || '',
+        profile:     response.profile || {}
+      };
+
+      // Save session then go to app
+      window.VibeState.saveSession(session);
+
+      showSuccess('Account created! Your ID: ' + session.idFormatted + ' — Redirecting…');
+
+      setTimeout(function () {
+        window.location.assign('./app.html');
+      }, 1500);
+
+    } catch (err) {
+      setLoading(false);
+      showError(err.message || 'Signup failed. Please try again.');
+    }
+  });
+
+  // ── Helpers ─────────────────────────────────────────────────
+  function showError(msg) {
+    errorBox.textContent = msg;
+    errorBox.classList.remove('hidden');
+    successBox.classList.add('hidden');
+  }
+
+  function showSuccess(msg) {
+    successBox.textContent = msg;
+    successBox.classList.remove('hidden');
+    errorBox.classList.add('hidden');
+  }
+
+  function hideMessages() {
+    errorBox.classList.add('hidden');
+    successBox.classList.add('hidden');
+    errorBox.textContent = '';
+    successBox.textContent = '';
+  }
+
+  function setLoading(on) {
+    submitBtn.disabled    = on;
+    submitBtn.textContent = on ? 'Creating account…' : 'Create Account';
   }
 });
