@@ -1,20 +1,16 @@
-const nodemailer = require("nodemailer");
+const { Resend } = require("resend");
 
-const transporter = nodemailer.createTransport({
-  service: "gmail",
-  auth: {
-    user: process.env.SMTP_EMAIL,
-    pass: process.env.SMTP_PASS
-  }
-});
+const resend = new Resend(process.env.RESEND_API_KEY);
 
 const sendEmail = async (to, subject, html) => {
-  await transporter.sendMail({
-    from: `"VibeChat" <${process.env.SMTP_EMAIL}>`,
+  const response = await resend.emails.send({
+    from: "VibeChat <onboarding@resend.dev>",
     to,
     subject,
     html
   });
+
+  return response;
 };
 
 module.exports = { sendEmail };
