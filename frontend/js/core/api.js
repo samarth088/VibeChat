@@ -1,8 +1,9 @@
 // js/core/api.js
 // API wrapper with DEV_MODE mocks — non-module
+// Load order: env.js → state.js → api.js
 
 (function () {
-  const cfg = window.ENV || { DEV_MODE: true };
+  var cfg = window.ENV || { DEV_MODE: true, API_URL: '' };
 
   function fetchJSON(url, opts) {
     return fetch(url, opts).then(function (res) {
@@ -13,111 +14,135 @@
 
   window.VibeAPI = {
 
-    // login({ identifier, password }) => session object
-    login: function ({ identifier, password }) {
+    // ── login ─────────────────────────────────────────────────
+    login: function (data) {
+      var identifier = data.identifier;
+      var password   = data.password;
       if (cfg.DEV_MODE) {
         return new Promise(function (resolve) {
           setTimeout(function () {
-            const userId = Math.floor(Math.random() * 90000) + 1;
+            var userId = Math.floor(Math.random() * 90000) + 1;
             resolve({
-              userId: userId,
+              userId:      userId,
               idFormatted: window.VibeState.formatId(userId),
-              username: identifier,
-              token: 'dev-token-' + userId,
-              profile: { bio: '🚀 Living on vibes. Connect with me on VibeChat!' }
+              username:    identifier,
+              token:       'dev-token-' + userId,
+              profile:     { bio: '🚀 Living on vibes. Connect with me on VibeChat!' }
             });
           }, 600);
         });
       }
       return fetchJSON(cfg.API_URL + '/auth/login', {
-        method: 'POST',
+        method:  'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ identifier, password })
+        body:    JSON.stringify({ identifier: identifier, password: password })
       });
     },
 
-    // signup({ fullname, username, contact, password }) => session object
-    signup: function ({ fullname, username, contact, password }) {
+    // ── sendOTP ───────────────────────────────────────────────
+    sendOTP: function (phone) {
       if (cfg.DEV_MODE) {
-        return new Promise(function (resolve, reject) {
+        return new Promise(function (resolve) {
           setTimeout(function () {
-            if (username.toLowerCase() === 'taken') {
-              return reject(new Error('Username already taken. Try another.'));
-            }
-            const userId = Math.floor(Math.random() * 90000) + 1;
-            resolve({
-              userId:      userId,
-              idFormatted: window.VibeState.formatId(userId),
-              username:    username,
-              token:       'dev-token-' + userId,
-              profile:     { bio: '🚀 Living on vibes. Connect with me on VibeChat!' }
-            });
+            console.log('[DEV] OTP sent to', phone, '— use 123456 to verify');
+            resolve({ success: true });
           }, 800);
         });
       }
-      return fetchJSON(cfg.API_URL + '/auth/signup', {
+      return fetchJSON(cfg.API_URL + '/auth/send-otp', {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify({ fullname, username, contact, password })
+        body:    JSON.stringify({ phone: phone })
       });
     },
 
-    // searchUsers(query) => [{ userId, idFormatted, username, online }]
+    // ── verifyOTPAndSignup ────────────────────────────────────
+    verifyOTPAndSignup: function (data) {
+      if (cfg.DEV_MODE) {
+        return new Promise(function (resolve, reject) {
+          setTimeout(function () {
+            if (data.otp !== '123456') {
+              return reject(new Error('Invalid OTP. (DEV: use 123456)'));
+            }
+            if ((data.username || '').toLowerCase() === 'taken') {
+              return reject(new Error('Username already taken.'));
+            }
+            var userId = Math.floor(Math.random() * 90000) + 1;
+            resolve({
+              userId:      userId,
+              idFormatted: window.VibeState.formatId(userId),
+              username:    data.username,
+              token:       'dev-token-' + userId,
+              profile:     { bio: '🚀 Living on vibes. Connect with me on VibeChat!' }
+            });
+          }, 700);
+        });
+      }
+      return fetchJSON(cfg.API_URL + '/auth/verify-otp-signup', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify(data)
+      });
+    },
+
+    // ── searchUsers ───────────────────────────────────────────
     searchUsers: function (query) {
       if (!query) return Promise.resolve([]);
-      const q = String(query).trim();
+      var q = String(query).trim();
       if (cfg.DEV_MODE) {
         if (q.startsWith('#')) {
-          const num = parseInt(q.replace('#', ''), 10) || Math.floor(Math.random() * 90000) + 1;
+          var num = parseInt(q.replace('#', ''), 10) || Math.floor(Math.random() * 90000) + 1;
           return Promise.resolve([{
-            userId: num,
+            userId:      num,
             idFormatted: window.VibeState.formatId(num),
-            username: 'user_' + num,
-            online: Math.random() > 0.5
+            username:    'user_' + num,
+            online:      Math.random() > 0.5
           }]);
         }
         return Promise.resolve([1, 2, 3].map(function (i) {
-          const id = Math.floor(Math.random() * 90000) + 1;
+          var id = Math.floor(Math.random() * 90000) + 1;
           return {
-            userId: id,
-            idFormatted: window.VibeState.formatId(id),  // FIX: was idFormated (typo)
-            username: q + '_sample' + i,
-            online: Math.random() > 0.5
+            userId:      id,
+            idFormatted: window.VibeState.formatId(id),
+            username:    q + '_sample' + i,
+            online:      Math.random() > 0.5
           };
         }));
       }
       return fetchJSON(cfg.API_URL + '/users/search?q=' + encodeURIComponent(q));
     },
 
-    // getUserById(userId) => user object
+    // ── getUserById ───────────────────────────────────────────
     getUserById: function (userId) {
       if (cfg.DEV_MODE) {
         return Promise.resolve({
-          userId: userId,
+          userId:      userId,
           idFormatted: window.VibeState.formatId(userId),
-          username: 'user_' + userId,
-          bio: 'Dev user'
+          username:    'user_' + userId,
+          bio:         'Dev user'
         });
       }
       return fetchJSON(cfg.API_URL + '/users/' + encodeURIComponent(userId));
     },
 
-    // openChatWith(userId, token) => { roomId, participants }
+    // ── openChatWith ──────────────────────────────────────────
     openChatWith: function (userId, token) {
       if (cfg.DEV_MODE) {
         return Promise.resolve({
-          roomId: 'room_' + Math.floor(Math.random() * 1000000),
+          roomId:       'room_' + Math.floor(Math.random() * 1000000),
           participants: [userId]
         });
       }
       return fetchJSON(cfg.API_URL + '/chats/open', {
-        method: 'POST',
+        method:  'POST',
         headers: {
-          'Content-Type': 'application/json',
+          'Content-Type':  'application/json',
           'Authorization': 'Bearer ' + (token || '')
         },
         body: JSON.stringify({ otherUserId: userId })
       });
     }
+
   };
+
 })();
