@@ -1,16 +1,33 @@
-const { Resend } = require("resend");
+const nodemailer = require("nodemailer");
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+if (!process.env.SMTP_EMAIL || !process.env.SMTP_PASS) {
+  console.error("❌ SMTP credentials missing in environment variables");
+}
+
+const transporter = nodemailer.createTransport({
+  service: "gmail",
+  auth: {
+    user: process.env.SMTP_EMAIL,
+    pass: process.env.SMTP_PASS
+  }
+});
 
 const sendEmail = async (to, subject, html) => {
-  const response = await resend.emails.send({
-    from: "VibeChat <onboarding@resend.dev>",
-    to,
-    subject,
-    html
-  });
+  try {
+    const info = await transporter.sendMail({
+      from: `"VibeChat" <${process.env.SMTP_EMAIL}>`,
+      to,
+      subject,
+      html
+    });
 
-  return response;
+    console.log("📧 Email sent:", info.messageId);
+    return info;
+
+  } catch (error) {
+    console.error("❌ Gmail SMTP Error:", error);
+    throw new Error("Failed to send email");
+  }
 };
 
 module.exports = { sendEmail };
