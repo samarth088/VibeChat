@@ -1,144 +1,213 @@
-const bcrypt = require("bcryptjs");
-const User = require("../models/User");
-const Otp = require("../models/Otp");
-const { generateToken } = require("../utils/jwt");
-const { generateOTP } = require("../utils/otp");
-const { sendEmail } = require("../utils/email");
+// controllers/auth.controller.js
+const bcrypt = require('bcryptjs');
+const User = require('../models/User');
+const OtpModel = require('../models/Otp');
+const { sendOtpEmail } = require('../utils/email');
+const { generateOtp, getOtpExpiry, isOtpExpired } = require('../utils/otp');
+const { generateToken } = require('../utils/jwt');
 
-// ================= SEND OTP =================
-exports.sendOtp = async (req, res, next) => {
+// ─────────────────────────────────────────────
+// POST /api/auth/send-otp
+// Body: { email }
+// ─────────────────────────────────────────────
+exports.sendOtp = async (req, res) => {
   try {
     const { email } = req.body;
 
     if (!email) {
-      return res.status(400).json({ error: "Email required" });
+      return res.status(400).json({ success: false, message: 'Email is required' });
     }
 
-    // Remove old OTP if exists
-    await Otp.deleteOne({ email });
+    const emailLower = email.toLowerCase().trim();
 
-    const otp = generateOTP();
-    const expiresAt = new Date(Date.now() + 5 * 60 * 1000); // 5 min
+    // Check if email already registered & verified
+    const existingUser = await User.findOne({ email: emailLower, isVerified: true });
+    if (existingUser) {
+      return res.status(409).json({ success: false, message: 'Email already registered. Please login.' });
+    }
 
-    await Otp.create({
-      email,
-      otp,
-      expiresAt
+    // Delete any previous OTPs for this email
+    await OtpModel.deleteMany({ email: emailLower });
+
+    // Generate new OTP
+    const otp = generateOtp();
+    const expiresAt = getOtpExpiry(10); // 10 minutes
+
+    // Save OTP to DB
+    await OtpModel.create({ email: emailLower, otp, expiresAt });
+
+    // Send email
+    await sendOtpEmail(emailLower, otp);
+
+    return res.status(200).json({
+      success: true,
+      message: `OTP sent to ${emailLower}. Check your inbox.`,
     });
 
-    await sendEmail(
-      email,
-      "Your VibeChat OTP",
-      `
-      <h2>Your OTP is: ${otp}</h2>
-      <p>This OTP will expire in 5 minutes.</p>
-      `
-    );
-
-    res.json({ message: "OTP sent successfully" });
-
-  } catch (err) {
-    console.error("SEND OTP ERROR:", err);
-    next(err);
+  } catch (error) {
+    console.error('sendOtp error:', error.message);
+    return res.status(500).json({ success: false, message: error.message || 'Server error' });
   }
 };
 
-// ================= VERIFY OTP + SIGNUP =================
-exports.verifyOtpAndSignup = async (req, res, next) => {
+// ─────────────────────────────────────────────
+// POST /api/auth/verify-otp
+// Body: { email, otp }
+// ─────────────────────────────────────────────
+exports.verifyOtp = async (req, res) => {
   try {
-    const { email, otp, username, password } = req.body;
+    const { email, otp } = req.body;
 
-    if (!email || !otp || !username || !password) {
-      return res.status(400).json({ error: "All fields are required" });
+    if (!email || !otp) {
+      return res.status(400).json({ success: false, message: 'Email and OTP are required' });
     }
 
-    // 1️⃣ Find OTP
-    const record = await Otp.findOne({ email, otp });
+    const emailLower = email.toLowerCase().trim();
 
-    if (!record) {
-      return res.status(400).json({ error: "Invalid or expired OTP" });
+    const otpRecord = await OtpModel.findOne({ email: emailLower }).sort({ createdAt: -1 });
+
+    if (!otpRecord) {
+      return res.status(400).json({ success: false, message: 'No OTP found. Please request a new one.' });
     }
 
-    // 2️⃣ Expiry check
-    if (record.expiresAt < new Date()) {
-      await Otp.deleteOne({ email });
-      return res.status(400).json({ error: "OTP expired" });
+    if (isOtpExpired(otpRecord.expiresAt)) {
+      await OtpModel.deleteMany({ email: emailLower });
+      return res.status(400).json({ success: false, message: 'OTP expired. Please request a new one.' });
     }
 
-    // 3️⃣ Delete OTP after verification
-    await Otp.deleteOne({ email });
-
-    // 4️⃣ Check duplicates
-    const emailExists = await User.findOne({ email });
-    if (emailExists) {
-      return res.status(400).json({ error: "Email already registered" });
+    if (otpRecord.otp !== String(otp).trim()) {
+      return res.status(400).json({ success: false, message: 'Invalid OTP. Please try again.' });
     }
 
-    const usernameExists = await User.findOne({ username });
-    if (usernameExists) {
-      return res.status(400).json({ error: "Username already taken" });
+    // Mark OTP as verified
+    otpRecord.verified = true;
+    await otpRecord.save();
+
+    return res.status(200).json({
+      success: true,
+      message: 'OTP verified successfully. Proceed to complete signup.',
+    });
+
+  } catch (error) {
+    console.error('verifyOtp error:', error.message);
+    return res.status(500).json({ success: false, message: 'Server error' });
+  }
+};
+
+// ─────────────────────────────────────────────
+// POST /api/auth/signup
+// Body: { name, email, password }
+// Call this AFTER OTP is verified
+// ─────────────────────────────────────────────
+exports.signup = async (req, res) => {
+  try {
+    const { name, email, password } = req.body;
+
+    if (!name || !email || !password) {
+      return res.status(400).json({ success: false, message: 'Name, email and password are required' });
     }
 
-    // 5️⃣ Create user
-    const hashed = await bcrypt.hash(password, 10);
+    const emailLower = email.toLowerCase().trim();
 
+    // Check OTP was verified
+    const otpRecord = await OtpModel.findOne({ email: emailLower, verified: true });
+    if (!otpRecord) {
+      return res.status(400).json({
+        success: false,
+        message: 'Email not verified. Please complete OTP verification first.',
+      });
+    }
+
+    // Check user doesn't already exist
+    const existingUser = await User.findOne({ email: emailLower });
+    if (existingUser && existingUser.isVerified) {
+      return res.status(409).json({ success: false, message: 'Email already registered.' });
+    }
+
+    // Hash password
+    const hashedPassword = await bcrypt.hash(password, 12);
+
+    // Create user — UID is auto-generated in model
     const user = await User.create({
-      username,
-      email,
-      password: hashed
+      name: name.trim(),
+      email: emailLower,
+      password: hashedPassword,
+      isVerified: true,
     });
 
-    const token = generateToken(user._id);
+    // Clean up OTP records
+    await OtpModel.deleteMany({ email: emailLower });
 
-    // ✅ FRONTEND COMPATIBLE RESPONSE
-    res.status(201).json({
-      userId: user._id,
-      username: user.username,
+    // Generate JWT
+    const token = generateToken({ userId: user._id });
+
+    return res.status(201).json({
+      success: true,
+      message: 'Account created successfully!',
       token,
-      profile: {
-        bio: "🚀 Living on vibes. Connect with me on VibeChat!"
-      }
+      user: {
+        id: user._id,
+        uid: user.uid,        // ← searchable UID like "vibe_a3f9k2"
+        name: user.name,
+        email: user.email,
+        avatar: user.avatar,
+        isVerified: user.isVerified,
+      },
     });
 
-  } catch (err) {
-    console.error("VERIFY OTP SIGNUP ERROR:", err);
-    next(err);
+  } catch (error) {
+    console.error('signup error:', error.message);
+    return res.status(500).json({ success: false, message: 'Server error' });
   }
 };
 
-// ================= LOGIN =================
-exports.login = async (req, res, next) => {
+// ─────────────────────────────────────────────
+// POST /api/auth/login
+// Body: { email, password }
+// ─────────────────────────────────────────────
+exports.login = async (req, res) => {
   try {
-    const { username, password } = req.body;
+    const { email, password } = req.body;
 
-    if (!username || !password) {
-      return res.status(400).json({ error: "Username and password required" });
+    if (!email || !password) {
+      return res.status(400).json({ success: false, message: 'Email and password are required' });
     }
 
-    const user = await User.findOne({ username });
+    const emailLower = email.toLowerCase().trim();
+
+    const user = await User.findOne({ email: emailLower });
+
     if (!user) {
-      return res.status(400).json({ error: "Invalid credentials" });
+      return res.status(401).json({ success: false, message: 'Invalid email or password' });
     }
 
-    const match = await bcrypt.compare(password, user.password);
-    if (!match) {
-      return res.status(400).json({ error: "Invalid credentials" });
+    if (!user.isVerified) {
+      return res.status(403).json({ success: false, message: 'Email not verified. Please signup again.' });
     }
 
-    const token = generateToken(user._id);
+    const isMatch = await bcrypt.compare(password, user.password);
+    if (!isMatch) {
+      return res.status(401).json({ success: false, message: 'Invalid email or password' });
+    }
 
-    // ✅ SAME STRUCTURE AS SIGNUP
-    res.json({
-      userId: user._id,
-      username: user.username,
+    const token = generateToken({ userId: user._id });
+
+    return res.status(200).json({
+      success: true,
+      message: 'Login successful',
       token,
-      profile: {
-        bio: "🚀 Living on vibes. Connect with me on VibeChat!"
-      }
+      user: {
+        id: user._id,
+        uid: user.uid,
+        name: user.name,
+        email: user.email,
+        avatar: user.avatar,
+        isVerified: user.isVerified,
+      },
     });
 
-  } catch (err) {
-    console.error("LOGIN ERROR:", err);
-    next(err);
+  } catch (error) {
+    console.error('login error:', error.message);
+    return res.status(500).json({ success: false, message: 'Server error' });
   }
 };
