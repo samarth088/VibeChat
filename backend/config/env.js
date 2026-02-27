@@ -6,8 +6,10 @@ dotenv.config();
 const requiredEnv = [
   "MONGO_URI",
   "JWT_SECRET",
-  "EMAIL",
-  "APP_PASSWORD"
+  "SMTP_HOST",
+  "SMTP_PORT",
+  "SMTP_USER",
+  "SMTP_PASS"
 ];
 
 // Check required env variables
@@ -20,19 +22,20 @@ requiredEnv.forEach((key) => {
 
 console.log("✅ Environment variables loaded");
 
-
 // ================= NODEMAILER CONFIG =================
 const nodemailer = require("nodemailer");
 
 const transporter = nodemailer.createTransport({
-  service: "gmail",
+  host: process.env.SMTP_HOST,
+  port: parseInt(process.env.SMTP_PORT),
+  secure: false,
   auth: {
-    user: process.env.EMAIL,
-    pass: process.env.APP_PASSWORD // Gmail App Password
+    user: process.env.SMTP_USER,
+    pass: process.env.SMTP_PASS
   }
 });
 
-// Optional: verify connection
+// Verify connection
 transporter.verify((error, success) => {
   if (error) {
     console.error("❌ Email transporter error:", error);
@@ -40,7 +43,6 @@ transporter.verify((error, success) => {
     console.log("✅ Email transporter ready");
   }
 });
-
 
 // ================= EXPORT =================
 module.exports = transporter;
