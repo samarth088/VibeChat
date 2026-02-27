@@ -1,40 +1,19 @@
-const nodemailer = require("nodemailer");
+const Brevo = require('@getbrevo/brevo');
 
-if (
-  !process.env.SMTP_HOST ||
-  !process.env.SMTP_PORT ||
-  !process.env.SMTP_USER ||
-  !process.env.SMTP_PASS
-) {
-  console.error("❌ SMTP credentials missing in environment variables");
-}
-
-const transporter = nodemailer.createTransport({
-  host: process.env.SMTP_HOST,
-  port: Number(process.env.SMTP_PORT),
-  secure: false, // IMPORTANT for 587 or 2525
-  auth: {
-    user: process.env.SMTP_USER,
-    pass: process.env.SMTP_PASS,
-  },
-  tls: {
-    rejectUnauthorized: false,
-  },
-});
+const apiInstance = new Brevo.TransactionalEmailsApi();
+apiInstance.authentications['api-key'].apiKey = process.env.BREVO_API_KEY;
 
 const sendEmail = async (to, subject, html) => {
   try {
-    const info = await transporter.sendMail({
-      from: `"VibeChat" <${process.env.SMTP_USER}>`,
-      to,
+    await apiInstance.sendTransacEmail({
+      sender: { email: 'a38ed6001@smtp-brevo.com', name: 'VibeChat' },
+      to: [{ email: to }],
       subject,
-      html,
+      htmlContent: html
     });
-
-    console.log("✅ Email sent:", info.messageId);
-    return info;
+    console.log("📧 Email sent via Brevo API");
   } catch (error) {
-    console.error("❌ Brevo SMTP Error:", error);
+    console.error("❌ Brevo API Error:", error);
     throw new Error("Failed to send email");
   }
 };
