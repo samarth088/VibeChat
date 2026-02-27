@@ -1,10 +1,12 @@
+// config/env.js
 const dotenv = require("dotenv");
 dotenv.config();
 
 const requiredEnv = [
   "MONGO_URI",
   "JWT_SECRET",
-  "BREVO_API_KEY"
+  "BREVO_API_KEY",
+  "FROM_EMAIL",     // ✅ Added — Brevo verified sender email
 ];
 
 requiredEnv.forEach((key) => {
