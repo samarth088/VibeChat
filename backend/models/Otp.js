@@ -1,26 +1,30 @@
-const mongoose = require("mongoose");
+// models/Otp.js
+const mongoose = require('mongoose');
 
-const otpSchema = new mongoose.Schema(
-  {
-    email: {
-      type: String,
-      required: true,
-      lowercase: true,
-      trim: true
-    },
-
-    otp: {
-      type: String,
-      required: true
-    },
-
-    expiresAt: {
-      type: Date,
-      required: true,
-      index: { expires: 0 } // 🔥 Auto delete after expiry
-    }
+const otpSchema = new mongoose.Schema({
+  email: {
+    type: String,
+    required: true,
+    lowercase: true,
+    trim: true,
   },
-  { timestamps: true }
-);
+  otp: {
+    type: String,
+    required: true,
+  },
+  expiresAt: {
+    type: Date,
+    required: true,
+    // Auto-delete from MongoDB after expiry
+    index: { expires: 0 },
+  },
+  verified: {
+    type: Boolean,
+    default: false,
+  },
+}, { timestamps: true });
 
-module.exports = mongoose.model("Otp", otpSchema);
+// Index for fast lookup
+otpSchema.index({ email: 1 });
+
+module.exports = mongoose.model('Otp', otpSchema);
