@@ -1,25 +1,23 @@
-const express = require("express");
+// routes/auth.routes.js
+const express = require('express');
 const router = express.Router();
-
 const {
   sendOtp,
-  verifyOtpAndSignup,
-  login
-} = require("../controllers/auth.controller");
+  verifyOtp,
+  signup,
+  login,
+} = require('../controllers/auth.controller');
 
-// ================= OTP =================
+// Step 1: Send OTP to email
+router.post('/send-otp', sendOtp);
 
-// Send OTP
-// POST /api/auth/send-otp
-router.post("/send-otp", sendOtp);
+// Step 2: Verify OTP
+router.post('/verify-otp', verifyOtp);
 
-// Verify OTP + Create Account
-// POST /api/auth/verify-otp-signup
-router.post("/verify-otp-signup", verifyOtpAndSignup);
+// Step 3: Complete signup (after OTP verified)
+router.post('/signup', signup);
 
-// ================= LOGIN =================
-
-// POST /api/auth/login
-router.post("/login", login);
+// Login
+router.post('/login', login);
 
 module.exports = router;
