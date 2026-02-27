@@ -2,7 +2,7 @@
 const bcrypt = require('bcryptjs');
 const User = require('../models/User');
 const OtpModel = require('../models/Otp');
-const { sendOtpEmail } = require('../utils/email');
+const { sendOtpEmail } = require('../utils/email');   // ✅ matches export in email.js
 const { generateOtp, getOtpExpiry, isOtpExpired } = require('../utils/otp');
 const { generateToken } = require('../utils/jwt');
 
@@ -20,23 +20,23 @@ exports.sendOtp = async (req, res) => {
 
     const emailLower = email.toLowerCase().trim();
 
-    // Check if email already registered & verified
+    // Check if already registered & verified
     const existingUser = await User.findOne({ email: emailLower, isVerified: true });
     if (existingUser) {
       return res.status(409).json({ success: false, message: 'Email already registered. Please login.' });
     }
 
-    // Delete any previous OTPs for this email
+    // Delete previous OTPs
     await OtpModel.deleteMany({ email: emailLower });
 
-    // Generate new OTP
+    // Generate OTP
     const otp = generateOtp();
-    const expiresAt = getOtpExpiry(10); // 10 minutes
+    const expiresAt = getOtpExpiry(10);
 
-    // Save OTP to DB
+    // Save to DB
     await OtpModel.create({ email: emailLower, otp, expiresAt });
 
-    // Send email
+    // Send email — passes otp directly, email.js handles HTML
     await sendOtpEmail(emailLower, otp);
 
     return res.status(200).json({
@@ -79,13 +79,12 @@ exports.verifyOtp = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Invalid OTP. Please try again.' });
     }
 
-    // Mark OTP as verified
     otpRecord.verified = true;
     await otpRecord.save();
 
     return res.status(200).json({
       success: true,
-      message: 'OTP verified successfully. Proceed to complete signup.',
+      message: 'OTP verified. Proceed to complete signup.',
     });
 
   } catch (error) {
@@ -97,7 +96,6 @@ exports.verifyOtp = async (req, res) => {
 // ─────────────────────────────────────────────
 // POST /api/auth/signup
 // Body: { name, email, password }
-// Call this AFTER OTP is verified
 // ─────────────────────────────────────────────
 exports.signup = async (req, res) => {
   try {
@@ -109,7 +107,7 @@ exports.signup = async (req, res) => {
 
     const emailLower = email.toLowerCase().trim();
 
-    // Check OTP was verified
+    // Must have verified OTP first
     const otpRecord = await OtpModel.findOne({ email: emailLower, verified: true });
     if (!otpRecord) {
       return res.status(400).json({
@@ -118,16 +116,14 @@ exports.signup = async (req, res) => {
       });
     }
 
-    // Check user doesn't already exist
+    // Check not already registered
     const existingUser = await User.findOne({ email: emailLower });
     if (existingUser && existingUser.isVerified) {
       return res.status(409).json({ success: false, message: 'Email already registered.' });
     }
 
-    // Hash password
     const hashedPassword = await bcrypt.hash(password, 12);
 
-    // Create user — UID is auto-generated in model
     const user = await User.create({
       name: name.trim(),
       email: emailLower,
@@ -135,10 +131,8 @@ exports.signup = async (req, res) => {
       isVerified: true,
     });
 
-    // Clean up OTP records
     await OtpModel.deleteMany({ email: emailLower });
 
-    // Generate JWT
     const token = generateToken({ userId: user._id });
 
     return res.status(201).json({
@@ -147,7 +141,7 @@ exports.signup = async (req, res) => {
       token,
       user: {
         id: user._id,
-        uid: user.uid,        // ← searchable UID like "vibe_a3f9k2"
+        uid: user.uid,
         name: user.name,
         email: user.email,
         avatar: user.avatar,
