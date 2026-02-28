@@ -184,3 +184,9 @@
   margin-left: auto;
   color: rgba(255,255,255,0.3);
 }
+
+/* Active conversation highlight */
+.conv-item.conv-active {
+  background: rgba(0, 100, 255, 0.15);
+  border-left: 3px solid #4db8ff;
+}
