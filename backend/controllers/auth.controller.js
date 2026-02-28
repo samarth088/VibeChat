@@ -135,10 +135,15 @@ exports.verifyOtp = async (req, res) => {
 
 
 // ─────────────────────────────────────────────
-// SIGNUP (FINAL SAFE VERSION)
+// SIGNUP (AUTO CLEAN NULL USERNAME FIX)
 // ─────────────────────────────────────────────
 exports.signup = async (req, res) => {
   try {
+
+    // 🔥 AUTO CLEANUP (only broken records)
+    await User.deleteMany({ username: null });
+    await User.deleteMany({ username: { $exists: false } });
+
     const { name, email, password } = req.body;
 
     if (!name || !email || !password) {
@@ -220,7 +225,6 @@ exports.signup = async (req, res) => {
     });
   }
 };
-
 
 // ─────────────────────────────────────────────
 // LOGIN
