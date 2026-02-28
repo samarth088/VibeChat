@@ -2,7 +2,7 @@
 const bcrypt = require('bcryptjs');
 const User = require('../models/User');
 const OtpModel = require('../models/Otp');
-const { sendOtpEmail } = require('../utils/email');   // ✅ matches export in email.js
+const { sendEmail } = require('../utils/email');   // ✅ matches export in email.js
 const { generateOtp, getOtpExpiry, isOtpExpired } = require('../utils/otp');
 const { generateToken } = require('../utils/jwt');
 
