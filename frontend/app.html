@@ -1,1 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>VibeChat</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1" />
 
+  <link rel="stylesheet" href="css/base.css" />
+  <link rel="stylesheet" href="css/components.css" />
+  <link rel="stylesheet" href="css/layout.css" />
+  <link rel="stylesheet" href="css/pages/chat.css" />
+</head>
+<body>
+
+<div class="phone">
+
+  <!-- Status Bar -->
+  <div class="status-bar">
+    <span>9:30</span>
+    <div class="status-icons">
+      <svg viewBox="0 0 24 24"><rect x="2" y="10" width="3" height="11" rx="1"/><rect x="7" y="7" width="3" height="14" rx="1"/><rect x="12" y="4" width="3" height="17" rx="1"/><rect x="17" y="1" width="3" height="20" rx="1"/></svg>
+      <svg viewBox="0 0 24 24"><path d="M1 7c0 0 5.5-6 11-6s11 6 11 6L12 22 1 7z"/></svg>
+      <svg viewBox="0 0 24 24"><rect x="1" y="6" width="18" height="12" rx="2"/><rect x="19" y="9" width="4" height="6" rx="1"/><rect x="3" y="8" width="10" height="8" rx="1" style="fill:white"/></svg>
+    </div>
+  </div>
+
+  <!-- Header -->
+  <div class="header">
+    <button class="header-btn" onclick="openProfile()">
+      <svg viewBox="0 0 24 24" width="22" height="22" fill="rgba(255,255,255,0.7)">
+        <circle cx="12" cy="8" r="4"/>
+        <path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/>
+      </svg>
+    </button>
+    <div></div>
+    <div class="header-icons">
+      <button class="header-btn" onclick="openSearch()">
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="rgba(255,255,255,0.7)" stroke-width="2.5" stroke-linecap="round">
+          <circle cx="11" cy="11" r="7"/>
+          <line x1="16.5" y1="16.5" x2="22" y2="22"/>
+        </svg>
+      </button>
+      <button class="header-btn" onclick="openSettings()">
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="rgba(255,255,255,0.7)">
+          <path d="M12 15a3 3 0 100-6 3 3 0 000 6z"/>
+          <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/>
+        </svg>
+      </button>
+    </div>
+  </div>
+
+  <!-- Logo -->
+  <div class="brand-logo">
+    <img src="assets/images/vibechat-logo.png" alt="VibeChat Logo" />
+  </div>
+
+  <!-- Search Bar -->
+  <div class="search-bar-wrap">
+    <div class="search-bar">
+      <svg viewBox="0 0 24 24">
+        <path d="M21 21l-4.35-4.35M17 11A6 6 0 111 11a6 6 0 0116 0z" stroke="rgba(100,180,255,0.7)" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+      </svg>
+      <input type="text" placeholder="Search ID or username..." readonly onclick="openSearch()" />
+      <button class="btn-new" onclick="openSearch()">New</button>
+    </div>
+  </div>
+
+  <!-- 🔥 DM Content (NOW EMPTY) -->
+  <div id="dmContent">
+    <div style="padding:30px;text-align:center;color:rgba(255,255,255,0.5);font-size:14px;">
+      No conversations yet.
+      <br><br>
+      Tap <b>New</b> to start chatting.
+    </div>
+  </div>
+
+  <!-- Group -->
+  <div class="group-content" id="groupContent">
+    <div class="group-icon-big">👥</div>
+    <div class="group-title">Create Your Group</div>
+    <div class="group-sub">Start a group with friends or teammates.</div>
+    <button class="btn-create-group">+ Create Group</button>
+  </div>
+
+  <!-- Calls -->
+  <div class="calls-content" id="callsContent">
+    <div class="group-icon-big">📞</div>
+    <div class="group-title">No Recent Calls</div>
+    <div class="group-sub">Your call history will appear here.</div>
+  </div>
+
+  <div class="nav-glow"></div>
+  <div class="bottom-nav">
+    <div class="nav-tab active" id="tab-dm" onclick="switchTab('dm')">DM</div>
+    <div class="nav-tab" id="tab-group" onclick="switchTab('group')">Group</div>
+    <div class="nav-tab" id="tab-calls" onclick="switchTab('calls')">Calls</div>
+  </div>
+
+</div>
+
+<!-- Scripts -->
+<script src="config/env.js"></script>
+<script src="js/core/state.js"></script>
+<script src="js/core/api.js"></script>
+<script src="js/core/socket.js"></script>
+<script src="js/utils/format.js"></script>
+<script src="js/utils/time.js"></script>
+<script src="js/utils/validators.js"></script>
+<script src="js/ui/header.js"></script>
+<script src="js/ui/overlays.js"></script>
+<script src="js/ui/bottomNav.js"></script>
+<script src="js/pages/chat.js"></script>
+
+<script>
+  initHeader();
+  function handleSignOut() {
+    if (window.VibeState) window.VibeState.clearSession();
+    window.location.replace('./index.html');
+  }
+</script>
+
+</body>
+</html>
