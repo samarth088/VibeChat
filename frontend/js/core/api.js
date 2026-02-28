@@ -1,6 +1,5 @@
 // js/core/api.js
-// API wrapper with DEV_MODE mocks — non-module
-// Load order: env.js → state.js → api.js
+// API wrapper — production ready
 
 (function () {
 
@@ -32,18 +31,14 @@
 
       if (cfg.DEV_MODE) {
         return new Promise(function (resolve) {
-
           setTimeout(function () {
-
             var userId = Math.floor(Math.random() * 90000) + 1;
-
             resolve({
               userId:   userId,
               username: email,
               token:    'dev-token-' + userId,
-              profile:  { bio: '🚀 Living on vibes. Connect with me on VibeChat!' }
+              profile:  { bio: '🚀 Living on vibes.' }
             });
-
           }, 600);
         });
       }
@@ -63,12 +58,7 @@
     sendOTP: function (email) {
 
       if (cfg.DEV_MODE) {
-        return new Promise(function (resolve) {
-          setTimeout(function () {
-            console.log('[DEV] OTP sent to', email, '— use 123456');
-            resolve({ success: true });
-          }, 800);
-        });
+        return Promise.resolve({ success: true });
       }
 
       return fetchJSON(cfg.API_URL + '/auth/send-otp', {
@@ -79,32 +69,18 @@
     },
 
 
-    // ── VERIFY OTP + SIGNUP (FIXED 2-STEP FLOW) ────────────
+    // ── VERIFY OTP + SIGNUP ─────────────────────────────────
     verifyOTPAndSignup: function (data) {
 
       if (cfg.DEV_MODE) {
-        return new Promise(function (resolve, reject) {
-
-          setTimeout(function () {
-
-            if (data.otp !== '123456') {
-              return reject(new Error('Invalid OTP. (DEV: use 123456)'));
-            }
-
-            var userId = Math.floor(Math.random() * 90000) + 1;
-
-            resolve({
-              userId:   userId,
-              username: data.username,
-              token:    'dev-token-' + userId,
-              profile:  { bio: '🚀 Living on vibes.' }
-            });
-
-          }, 700);
+        return Promise.resolve({
+          userId:   1,
+          username: data.username,
+          token:    'dev-token',
+          profile:  {}
         });
       }
 
-      // STEP 1: Verify OTP
       return fetchJSON(cfg.API_URL + '/auth/verify-otp', {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -113,8 +89,6 @@
           otp:   data.otp
         })
       })
-
-      // STEP 2: Then create account
       .then(function () {
         return fetchJSON(cfg.API_URL + '/auth/signup', {
           method:  'POST',
@@ -129,38 +103,62 @@
     },
 
 
-    // ── SEARCH USERS ─────────────────────────────────────────
+    // ── SEARCH USERS (UID BASED + AUTH) ─────────────────────
     searchUsers: function (query) {
 
       if (!query) return Promise.resolve([]);
 
-      var q = String(query).trim();
-
       if (cfg.DEV_MODE) {
-        var id = Math.floor(Math.random() * 90000) + 1;
-        return Promise.resolve([{
-          userId:   id,
-          username: q + '_sample',
-          online:   true
-        }]);
+        return Promise.resolve([]);
       }
 
-      return fetchJSON(cfg.API_URL + '/users/search?q=' + encodeURIComponent(q));
+      var sess = window.VibeState.session;
+      if (!sess || !sess.token) {
+        return Promise.reject(new Error('Not authenticated'));
+      }
+
+      return fetchJSON(
+        cfg.API_URL + '/users/search?uid=' + encodeURIComponent(query.trim()),
+        {
+          method: 'GET',
+          headers: {
+            'Authorization': 'Bearer ' + sess.token
+          }
+        }
+      )
+      .then(function (res) {
+        if (!res.success || !res.user) return [];
+        return [res.user]; // normalize for UI
+      })
+      .catch(function () {
+        return [];
+      });
     },
 
 
-    // ── GET USER BY ID ───────────────────────────────────────
+    // ── GET USER BY ID (AUTH) ───────────────────────────────
     getUserById: function (userId) {
 
       if (cfg.DEV_MODE) {
         return Promise.resolve({
           userId:   userId,
-          username: 'user_' + userId,
-          bio:      'Dev user'
+          username: 'dev_user'
         });
       }
 
-      return fetchJSON(cfg.API_URL + '/users/' + encodeURIComponent(userId));
+      var sess = window.VibeState.session;
+
+      return fetchJSON(
+        cfg.API_URL + '/users/search?uid=' + encodeURIComponent(userId),
+        {
+          method: 'GET',
+          headers: {
+            'Authorization': 'Bearer ' + (sess ? sess.token : '')
+          }
+        }
+      ).then(function (res) {
+        return res.user;
+      });
     },
 
 
@@ -169,8 +167,7 @@
 
       if (cfg.DEV_MODE) {
         return Promise.resolve({
-          roomId:       'room_' + Math.floor(Math.random() * 1000000),
-          participants: [userId]
+          roomId: 'room_' + userId
         });
       }
 
@@ -178,7 +175,7 @@
         method: 'POST',
         headers: {
           'Content-Type':  'application/json',
-          'Authorization': 'Bearer ' + (token || '')
+          'Authorization': 'Bearer ' + token
         },
         body: JSON.stringify({ otherUserId: userId })
       });
