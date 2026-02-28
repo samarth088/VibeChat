@@ -2,7 +2,9 @@
    components.css — Buttons, Inputs, Avatars, Badges, Toggles
    ============================================= */
 
-/* ── Buttons ── */
+/* ─────────────────────────
+   BUTTONS
+   ───────────────────────── */
 
 .btn-primary {
   width: 100%;
@@ -62,7 +64,42 @@
   font-size: 13px;
 }
 
-/* ── Sheet input ── */
+/* ─────────────────────────
+   SHEET SYSTEM (FIXED)
+   ───────────────────────── */
+
+.sheet-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(0,0,0,0.55);
+  display: none;
+  justify-content: center;
+  align-items: flex-end;
+  z-index: 1000;
+}
+
+.sheet-overlay.active {
+  display: flex;
+}
+
+.sheet {
+  width: 100%;
+  max-height: 85%;
+  background: #081226;
+  border-radius: 20px 20px 0 0;
+  padding: 20px;
+  transform: translateY(100%);
+  transition: transform 0.3s ease;
+  overflow-y: auto;
+}
+
+.sheet-overlay.active .sheet {
+  transform: translateY(0);
+}
+
+/* ─────────────────────────
+   SHEET INPUT
+   ───────────────────────── */
 
 .sheet-input {
   display: flex;
@@ -86,7 +123,9 @@
   color: rgba(255,255,255,0.35);
 }
 
-/* ── Avatars ── */
+/* ─────────────────────────
+   AVATARS
+   ───────────────────────── */
 
 .avatar {
   width: 54px;
@@ -108,7 +147,9 @@
   flex-shrink: 0;
 }
 
-/* ── Badges ── */
+/* ─────────────────────────
+   BADGES
+   ───────────────────────── */
 
 .unread-badge,
 .unread-count {
@@ -135,7 +176,9 @@
   display: inline-block;
 }
 
-/* ── Toggle ── */
+/* ─────────────────────────
+   TOGGLE
+   ───────────────────────── */
 
 .toggle {
   width: 44px;
@@ -162,7 +205,9 @@
 }
 .toggle.on::after { transform: translateX(20px); }
 
-/* ── Search result rows ── */
+/* ─────────────────────────
+   SEARCH RESULTS
+   ───────────────────────── */
 
 .search-row {
   display: flex;
@@ -220,4 +265,4 @@
   color: rgba(255,255,255,0.25);
   font-size: 13px;
   padding: 24px 0;
-}
+   }
