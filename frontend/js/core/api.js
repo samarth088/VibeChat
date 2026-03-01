@@ -41,22 +41,23 @@
       });
     },
 
-    // ── sendOTP ───────────────────────────────────────────────
-    sendOTP: function (contact) {
-      if (cfg.DEV_MODE) {
-        return new Promise(function (resolve) {
-          setTimeout(function () {
-            console.log('[DEV] OTP sent to', contact, '— use 123456 to verify');
-            resolve({ success: true });
-          }, 800);
-        });
-      }
-      return fetchJSON(cfg.API_URL + '/auth/send-otp', {
-        method:  'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify({ contact: contact })
-      });
+  // ── SEND OTP ────────────────────────────────────────────
+sendOTP: function (email) {
+
+  if (!email) {
+    return Promise.reject(new Error("Email is required"));
+  }
+
+  return fetchJSON(cfg.API_URL + '/auth/send-otp', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json'
     },
+    body: JSON.stringify({
+      email: email
+    })
+  });
+},
 
     // ── verifyOTPAndSignup ────────────────────────────────────
     verifyOTPAndSignup: function (data) {
