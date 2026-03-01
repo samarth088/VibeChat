@@ -58,7 +58,10 @@ exports.searchUser = async (req, res, next) => {
     const { uid } = req.query;
 
     if (!uid || !uid.trim()) {
-      return res.status(400).json({ success: false, message: "Search query is required" });
+      return res.status(400).json({
+        success: false,
+        message: "Search query is required"
+      });
     }
 
     const query = uid.trim().toLowerCase();
@@ -68,12 +71,14 @@ exports.searchUser = async (req, res, next) => {
         { uid: query },
         { username: query },
       ],
-      _id: { $ne: req.user._id },
-    // ✅ FIX: "id" ki jagah "_id" — MongoDB mein field _id hoti hai, id nahi
+      _id: { $ne: req.user.id }, // ✅ CORRECT
     }).select("_id name username uid avatar status");
 
     if (!user) {
-      return res.status(404).json({ success: false, message: "User not found" });
+      return res.status(404).json({
+        success: false,
+        message: "User not found"
+      });
     }
 
     return res.status(200).json({
@@ -87,6 +92,7 @@ exports.searchUser = async (req, res, next) => {
         online:   user.status === "online",
       },
     });
+
   } catch (err) {
     next(err);
   }
