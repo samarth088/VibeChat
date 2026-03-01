@@ -12,7 +12,6 @@
   function renderProfile(sess) {
     qsa('.profile-name').forEach(function(el){ el.textContent = sess.name || sess.username || 'Your Name'; });
     qsa('.profile-uid').forEach(function(el){
-      // ✅ FIX: uid directly show karo (vibe_a3f9k2) — pehle formatId numeric se #00000 banta tha
       var uidDisplay = sess.uid || sess.idFormatted || '';
       el.textContent = (sess.username ? '@' + sess.username + ' · ' : '') + 'ID: ' + uidDisplay;
     });
@@ -20,6 +19,15 @@
     if (av) av.textContent = (sess.name || sess.username || 'Y').charAt(0).toUpperCase();
     var bio = qs('.profile-bio');
     if (bio) bio.textContent = (sess.profile && sess.profile.bio) || '🚀 Living on vibes.';
+  }
+
+  // ── Show/hide empty state ──────────────────────────────────
+  function updateEmptyState() {
+    var dmList  = qid('dmContent');
+    var emptyEl = qid('dmEmpty');
+    if (!dmList || !emptyEl) return;
+    var hasItems = dmList.querySelectorAll('.conv-item').length > 0;
+    emptyEl.style.display = hasItems ? 'none' : 'block';
   }
 
   // ── Build full-screen chat page ────────────────────────────
@@ -106,8 +114,8 @@
     var text  = (input ? input.value : '').trim();
     if (!text) return;
     if (!msgStore[roomId]) msgStore[roomId] = [];
-    msgStore[roomId].push({ text, isMe: true, time: nowTime() });
-    window.sendWS && window.sendWS({ type: 'message', room: roomId, text });
+    msgStore[roomId].push({ text: text, isMe: true, time: nowTime() });
+    window.sendWS && window.sendWS({ type: 'message', room: roomId, text: text });
     var preview = qs('[data-userid="'+userObj.userId+'"] .conv-preview');
     if (preview) preview.textContent = text;
     var timeEl = qs('[data-userid="'+userObj.userId+'"] .conv-time');
@@ -136,29 +144,18 @@
       '<div class="conv-meta"><span class="conv-time">Now</span></div>';
     item.addEventListener('click', function(){ openChatPage(userObj, roomId); });
     dmList.insertBefore(item, dmList.firstChild);
+    updateEmptyState();
     openChatPage(userObj, roomId);
   }
 
-  function wireStaticItems() {
-    qsa('.conv-item').forEach(function(item) {
-      item.addEventListener('click', function() {
-        var userId   = this.getAttribute('data-userid') || ('u_'+Date.now());
-        var roomId   = this.getAttribute('data-room')   || ('room_'+userId);
-        var username = (this.querySelector('.conv-name')||{}).textContent || 'User';
-        openChatPage({ userId, username }, roomId);
-      });
-    });
-  }
-
   // ✅ FIX: userObj object accept karta hai, string nahi
-  // Pehle string userId leta tha → getUserById API call karta tha → route nahi tha → fail
   window.openChatFromSearch = async function(userObj) {
     try {
       if (typeof userObj === 'string') userObj = { userId: userObj, username: 'User' };
       var sess   = window.VibeState.session;
       var open   = await window.VibeAPI.openChatWith(userObj.userId, sess && sess.token);
       var roomId = open.roomId || ('room_' + userObj.userId);
-      window.VibeState.currentChat = { roomId, userId: userObj.userId, username: userObj.username };
+      window.VibeState.currentChat = { roomId: roomId, userId: userObj.userId, username: userObj.username };
       addOrFocusConversation(userObj, roomId);
       window.switchTab && window.switchTab('dm');
     } catch(e) { console.error('[Chat]', e); }
@@ -168,7 +165,7 @@
     var sess = window.VibeState.loadSession();
     if (!sess) { window.location.replace('./index.html'); return; }
     renderProfile(sess);
-    wireStaticItems();
+    updateEmptyState();
     try {
       if (window.VibeSocket && typeof window.VibeSocket.connect === 'function') {
         window.VibeSocket.connect(sess.token, function(msg) {
