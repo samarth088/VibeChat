@@ -1,11 +1,17 @@
+// services/user.service.js
 const User = require("../models/User");
 
-const createUser = async ({ username, password }) => {
-  return await User.create({ username, password });
+// ✅ FIX: createUser ab saare fields leta hai — pehle sirf username+password tha
+const createUser = async ({ name, username, email, password }) => {
+  return await User.create({ name, username, email, password });
 };
 
 const findUserByUsername = async (username) => {
-  return await User.findOne({ username });
+  return await User.findOne({ username: username.toLowerCase().trim() });
+};
+
+const findUserByEmail = async (email) => {
+  return await User.findOne({ email: email.toLowerCase().trim() });
 };
 
 const findUserById = async (id) => {
@@ -13,22 +19,23 @@ const findUserById = async (id) => {
 };
 
 const getAllUsers = async (currentUserId) => {
-  return await User.find({ _id: { $ne: currentUserId } })
-    .select("-password");
+  return await User.find({ _id: { $ne: currentUserId } }).select("-password");
 };
 
 const updateUserProfile = async (userId, data) => {
-  return await User.findByIdAndUpdate(
-    userId,
-    data,
-    { new: true }
-  ).select("-password");
+  return await User.findByIdAndUpdate(userId, data, { new: true }).select("-password");
+};
+
+const findUserByUid = async (uid) => {
+  return await User.findOne({ uid }).select("-password");
 };
 
 module.exports = {
   createUser,
   findUserByUsername,
+  findUserByEmail,
   findUserById,
   getAllUsers,
-  updateUserProfile
+  updateUserProfile,
+  findUserByUid,
 };
