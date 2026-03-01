@@ -74,35 +74,41 @@
     },
 
     // ─────────────────────────────────────────
-    // SEARCH USERS
-    // ✅ FIX: uid, name, avatar sab return hota hai ab
     // ─────────────────────────────────────────
-    searchUsers: function (query) {
-      if (!query) return Promise.resolve([]);
-      var q = String(query).trim();
+// SEARCH USERS
+// ─────────────────────────────────────────
+searchUsers: function (query) {
+  if (!query) return Promise.resolve([]);
+  var q = String(query).trim();
 
-      if (cfg.DEV_MODE) {
-        return Promise.resolve([{
-          userId: 'dev_found_001', uid: 'vibe_' + Math.random().toString(36).slice(2, 8),
-          name: q + ' User', username: q + '_sample', online: true
-        }]);
-      }
+  if (cfg.DEV_MODE) {
+    return Promise.resolve([{
+      userId: 'dev_found_001',
+      uid: 'vibe_' + Math.random().toString(36).slice(2, 8),
+      idFormatted: window.VibeState.formatId('dev_found_001'),
+      name: q + ' User',
+      username: q + '_sample',
+      avatar: '',
+      online: true
+    }]);
+  }
 
-      return fetchJSON(cfg.API_URL + '/users/search?uid=' + encodeURIComponent(q), {
-        headers: authHeader()
-      }).then(function (res) {
-        if (!res.success || !res.user) return [];
-        return [{
-          userId:   res.user.id,
-          uid:      res.user.uid,
-          name:     res.user.name,
-          username: res.user.username || res.user.name,
-          avatar:   res.user.avatar || '',
-          online:   res.user.online || false
-        }];
-      });
-    },
+  return fetchJSON(cfg.API_URL + '/users/search?uid=' + encodeURIComponent(q), {
+    headers: authHeader()
+  }).then(function (res) {
+    if (!res.success || !res.user) return [];
 
+    return [{
+      userId:   res.user.id,
+      uid:      res.user.uid,
+      idFormatted: window.VibeState.formatId(res.user.id), // ✅ THIS WAS MISSING
+      name:     res.user.name,
+      username: res.user.username || res.user.name,
+      avatar:   res.user.avatar || '',
+      online:   res.user.online || false
+    }];
+  });
+},
     // ─────────────────────────────────────────
     // GET USER BY ID
     // ─────────────────────────────────────────
