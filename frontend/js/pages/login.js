@@ -1,12 +1,4 @@
 // js/pages/login.js
-// Login page logic — ES module (loaded with type="module" in index.html)
-//
-// FIXES:
-//  1. saveSession was re-declared inside the try block — session never saved
-//  2. window.location.assign ran before localStorage write completed
-//  3. Removed duplicate STORAGE_KEY and formatId (use VibeState from state.js)
-//  NOTE: login.js is type="module" but VibeState/VibeAPI are on window so still accessible
-
 document.addEventListener('DOMContentLoaded', function () {
   var form      = document.getElementById('loginForm');
   var errorBox  = document.getElementById('loginError');
@@ -17,7 +9,6 @@ document.addEventListener('DOMContentLoaded', function () {
   form.addEventListener('submit', async function (e) {
     e.preventDefault();
 
-    // Hide previous errors
     errorBox.textContent = '';
     errorBox.classList.add('hidden');
 
@@ -25,7 +16,6 @@ document.addEventListener('DOMContentLoaded', function () {
     var identifier = (formData.get('identifier') || '').trim();
     var password   = formData.get('password') || '';
 
-    // Basic validation
     if (!identifier || !password) {
       showError('Please fill in all fields.');
       return;
@@ -38,24 +28,28 @@ document.addEventListener('DOMContentLoaded', function () {
     setLoading(true);
 
     try {
-      // Use VibeAPI (from api.js loaded via <script> in index.html)
-      // DEV_MODE => mock, production => real fetch
-      var response = await window.VibeAPI.login({ identifier: identifier, password: password });
+      var response = await window.VibeAPI.login({
+        identifier: identifier,
+        password:   password
+      });
 
-      // Build session object
+      // ── FIX: response.user aata hai backend se ──
+      // auth.controller.js returns: { token, user: { id, uid, username, email, avatar } }
+      var userData = response.user || {};
+
       var session = {
-        userId:      response.userId,
-        idFormatted: response.idFormatted || window.VibeState.formatId(response.userId),
-        username:    response.username || identifier,
+        userId:      userData.id   || response.userId,
+        uid:         userData.uid  || '',          // ← vibe_a3f9k2 format
+        idFormatted: userData.uid  || '',          // display ke liye same uid
+        username:    userData.username || userData.email || identifier,
+        email:       userData.email || identifier,
+        avatar:      userData.avatar || '',
         token:       response.token || '',
         profile:     response.profile || {}
       };
 
-      // FIX: save session FIRST, then redirect
-      // (old code re-declared saveSession inside try block so it was never called)
       window.VibeState.saveSession(session);
 
-      // Small delay to ensure localStorage flush before navigation
       setTimeout(function () {
         window.location.assign('./app.html');
       }, 50);
