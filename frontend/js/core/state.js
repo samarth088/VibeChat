@@ -1,6 +1,4 @@
 // js/core/state.js
-// Global state helper — non-module, loaded before everything else
-
 (function () {
   const STORAGE_KEY = 'vibe_session_v1';
 
@@ -8,27 +6,22 @@
     session: null,
     currentChat: null,
 
-    // Format numeric ID to #00042
-    formatId: function (n) {
-      const num = Number(n) || 0;
+    // ✅ FIX: Backend "vibe_a3f9k2" string UID bhejta hai
+    // Number("vibe_a3f9k2") = NaN = 0 = #00000 → yahi bug tha
+    formatId: function (uid) {
+      if (!uid) return '#00000';
+      if (typeof uid === 'string' && uid.startsWith('vibe_')) return uid;
+      const num = Number(uid) || 0;
       return '#' + String(num).padStart(5, '0');
     },
 
-    // Save session to memory + localStorage
     saveSession: function (sessionObj) {
-      const payload = {
-        ...sessionObj,
-        createdAt: Date.now()
-      };
+      const payload = { ...sessionObj, createdAt: Date.now() };
       window.VibeState.session = payload;
-      try {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
-      } catch (e) {
-        console.warn('saveSession: localStorage write failed', e);
-      }
+      try { localStorage.setItem(STORAGE_KEY, JSON.stringify(payload)); }
+      catch (e) { console.warn('saveSession failed', e); }
     },
 
-    // Load session from localStorage into memory
     loadSession: function () {
       try {
         const raw = localStorage.getItem(STORAGE_KEY);
@@ -42,13 +35,10 @@
       }
     },
 
-    // Clear session from memory + localStorage
     clearSession: function () {
       window.VibeState.session = null;
       window.VibeState.currentChat = null;
-      try {
-        localStorage.removeItem(STORAGE_KEY);
-      } catch (e) {}
+      try { localStorage.removeItem(STORAGE_KEY); } catch (e) {}
     }
   };
 })();
