@@ -1,14 +1,11 @@
 const Chat = require("../models/Chat");
 const Message = require("../models/Message");
 
-
-// ─────────────────────────────────────────
 // CREATE OR GET CHAT
-// ─────────────────────────────────────────
 exports.createOrGetChat = async (req, res, next) => {
   try {
 
-    const currentUserId = req.userId;   // ✅ use userId
+    const currentUserId = req.user._id;  // ✅ FIX
     const { otherUserId } = req.body;
 
     if (!otherUserId) {
@@ -37,13 +34,11 @@ exports.createOrGetChat = async (req, res, next) => {
 };
 
 
-// ─────────────────────────────────────────
 // GET USER CHATS
-// ─────────────────────────────────────────
 exports.getUserChats = async (req, res, next) => {
   try {
 
-    const currentUserId = req.userId;  // ✅ FIX
+    const currentUserId = req.user._id; // ✅ FIX
 
     const chats = await Chat.find({
       members: currentUserId
@@ -74,9 +69,7 @@ exports.getUserChats = async (req, res, next) => {
 };
 
 
-// ─────────────────────────────────────────
 // GET CHAT MESSAGES
-// ─────────────────────────────────────────
 exports.getChatMessages = async (req, res, next) => {
   try {
 
