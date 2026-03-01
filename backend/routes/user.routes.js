@@ -1,13 +1,28 @@
 const express = require("express");
 const router = express.Router();
-const { getAllUsers, getProfile, updateProfile, searchUser } = require("../controllers/user.controller");
+
+const {
+  getAllUsers,
+  getProfile,
+  updateProfile,
+  searchUser
+} = require("../controllers/user.controller");
+
 const { protect } = require("../middleware/auth.middleware");
 
+// Protect all routes
 router.use(protect);
 
-router.get("/search", searchUser);  // ← pehle
+// Search user by username or UID
+router.get("/search", searchUser);
+
+// Get my profile
 router.get("/me", getProfile);
+
+// Update my profile
 router.put("/me", updateProfile);
+
+// Get all users (except me)
 router.get("/all", getAllUsers);
 
 module.exports = router;
