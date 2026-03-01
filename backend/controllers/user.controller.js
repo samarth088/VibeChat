@@ -1,29 +1,39 @@
+// controllers/user.controller.js
 const User = require("../models/User");
 
+// ─────────────────────────────────────────────
 // GET ALL USERS
+// ─────────────────────────────────────────────
 exports.getAllUsers = async (req, res, next) => {
   try {
     const users = await User.find(
       { _id: { $ne: req.user.id } },
-      "username name bio avatar uid"
+      "username name bio avatar uid status"
     );
-    res.json(users);
+    res.json({ success: true, users });
   } catch (err) {
     next(err);
   }
 };
 
-// GET PROFILE
+// ─────────────────────────────────────────────
+// GET MY PROFILE
+// ─────────────────────────────────────────────
 exports.getProfile = async (req, res, next) => {
   try {
     const user = await User.findById(req.user.id).select("-password");
-    res.json(user);
+    if (!user) {
+      return res.status(404).json({ success: false, message: "User not found" });
+    }
+    res.json({ success: true, user });
   } catch (err) {
     next(err);
   }
 };
 
+// ─────────────────────────────────────────────
 // UPDATE PROFILE
+// ─────────────────────────────────────────────
 exports.updateProfile = async (req, res, next) => {
   try {
     const { bio, avatar } = req.body;
@@ -32,7 +42,7 @@ exports.updateProfile = async (req, res, next) => {
       { bio, avatar },
       { new: true }
     ).select("-password");
-    res.json(user);
+    res.json({ success: true, user });
   } catch (err) {
     next(err);
   }
@@ -40,36 +50,30 @@ exports.updateProfile = async (req, res, next) => {
 
 // ─────────────────────────────────────────────
 // SEARCH USER BY UID or USERNAME
-// GET /users/search?uid=vibe_a3f9k2
-// GET /users/search?uid=tanuu
+// GET /api/users/search?uid=vibe_a3f9k2
+// GET /api/users/search?uid=tanuu
 // ─────────────────────────────────────────────
 exports.searchUser = async (req, res, next) => {
   try {
     const { uid } = req.query;
 
     if (!uid || !uid.trim()) {
-      return res.status(400).json({
-        success: false,
-        message: "Search query is required",
-      });
+      return res.status(400).json({ success: false, message: "Search query is required" });
     }
 
     const query = uid.trim().toLowerCase();
 
-    // Search by uid OR username (case-insensitive)
     const user = await User.findOne({
       $or: [
         { uid: query },
         { username: query },
       ],
-      _id: { $ne: req.user.id }, // exclude self
-    }).select("id name username uid avatar status");
+      _id: { $ne: req.user._id },
+    // ✅ FIX: "id" ki jagah "_id" — MongoDB mein field _id hoti hai, id nahi
+    }).select("_id name username uid avatar status");
 
     if (!user) {
-      return res.status(404).json({
-        success: false,
-        message: "User not found",
-      });
+      return res.status(404).json({ success: false, message: "User not found" });
     }
 
     return res.status(200).json({
