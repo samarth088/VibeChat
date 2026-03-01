@@ -7,15 +7,15 @@ const {
   getGroupMessages
 } = require("../controllers/group.controller");
 
-const authMiddleware = require("../middleware/auth.middleware");
+const { protect } = require("../middleware/auth.middleware"); // ✅ FIX
 
 // POST /api/groups
-router.post("/", authMiddleware, createGroup);
+router.post("/", protect, createGroup);
 
 // GET /api/groups
-router.get("/", authMiddleware, getUserGroups);
+router.get("/", protect, getUserGroups);
 
 // GET /api/groups/:groupId/messages
-router.get("/:groupId/messages", authMiddleware, getGroupMessages);
+router.get("/:groupId/messages", protect, getGroupMessages);
 
 module.exports = router;
