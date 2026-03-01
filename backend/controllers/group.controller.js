@@ -1,14 +1,11 @@
 const Group = require("../models/Group");
 const Message = require("../models/Message");
 
-
-// ─────────────────────────────────────────
 // CREATE GROUP
-// ─────────────────────────────────────────
 exports.createGroup = async (req, res, next) => {
   try {
 
-    const currentUserId = req.userId;  // ✅ FIX
+    const currentUserId = req.user._id; // ✅ FIX
     const { name, members } = req.body;
 
     if (!name) {
@@ -29,13 +26,11 @@ exports.createGroup = async (req, res, next) => {
 };
 
 
-// ─────────────────────────────────────────
 // GET USER GROUPS
-// ─────────────────────────────────────────
 exports.getUserGroups = async (req, res, next) => {
   try {
 
-    const currentUserId = req.userId;  // ✅ FIX
+    const currentUserId = req.user._id; // ✅ FIX
 
     const groups = await Group.find({
       members: currentUserId
@@ -49,9 +44,7 @@ exports.getUserGroups = async (req, res, next) => {
 };
 
 
-// ─────────────────────────────────────────
 // GET GROUP MESSAGES
-// ─────────────────────────────────────────
 exports.getGroupMessages = async (req, res, next) => {
   try {
 
