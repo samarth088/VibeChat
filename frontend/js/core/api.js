@@ -1,4 +1,3 @@
-// js/core/api.js
 (function () {
 
   var cfg = window.ENV || {};
@@ -25,22 +24,13 @@
     // LOGIN
     // ─────────────────────────────────────────
     login: function (data) {
-      if (cfg.DEV_MODE) {
-        return new Promise(function (resolve) {
-          setTimeout(function () {
-            var fakeUid = 'vibe_' + Math.random().toString(36).slice(2, 8);
-            resolve({
-              token: 'dev-token-123',
-              user: { id: 'dev_001', uid: fakeUid, name: 'Dev User', username: data.identifier.split('@')[0], email: data.identifier, avatar: '' }
-            });
-          }, 600);
-        });
-      }
-
       return fetchJSON(cfg.API_URL + '/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: data.identifier, password: data.password })
+        body: JSON.stringify({
+          email: data.identifier,
+          password: data.password
+        })
       });
     },
 
@@ -63,31 +53,41 @@
       return fetchJSON(cfg.API_URL + '/auth/verify-otp', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: data.email, otp: data.otp })
+        body: JSON.stringify({
+          email: data.email,
+          otp: data.otp
+        })
       }).then(function () {
         return fetchJSON(cfg.API_URL + '/auth/signup', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ name: data.fullname, email: data.email, password: data.password })
+          body: JSON.stringify({
+            name: data.fullname,
+            email: data.email,
+            password: data.password
+          })
         });
       });
     },
 
     // ─────────────────────────────────────────
     // SEARCH USERS
-    // DEV_MODE mein koi fake result nahi — real API hi use hoga
     // ─────────────────────────────────────────
     searchUsers: function (query) {
       if (!query) return Promise.resolve([]);
+
       var q = String(query).trim();
 
       return fetchJSON(cfg.API_URL + '/users/search?uid=' + encodeURIComponent(q), {
         headers: authHeader()
       }).then(function (res) {
+
         if (!res.success || !res.user) return [];
+
         return [{
           userId:   res.user.id,
           uid:      res.user.uid,
+          idFormatted: res.user.uid,   // 🔥 FIXED — no more #00000
           name:     res.user.name,
           username: res.user.username || res.user.name,
           avatar:   res.user.avatar || '',
@@ -100,24 +100,21 @@
     // GET USER BY ID
     // ─────────────────────────────────────────
     getUserById: function (userId) {
-      if (cfg.DEV_MODE) {
-        return Promise.resolve({ userId: userId, uid: 'vibe_devusr', name: 'Dev User', username: 'user_' + userId });
-      }
       return fetchJSON(cfg.API_URL + '/users/' + encodeURIComponent(userId), {
         headers: authHeader()
       });
     },
 
     // ─────────────────────────────────────────
-    // OPEN CHAT
+    // OPEN CHAT (FIXED ENDPOINT)
     // ─────────────────────────────────────────
     openChatWith: function (userId, token) {
-      if (cfg.DEV_MODE) {
-        return Promise.resolve({ roomId: 'room_' + Math.floor(Math.random() * 1000000) });
-      }
-      return fetchJSON(cfg.API_URL + '/chats/open', {
+      return fetchJSON(cfg.API_URL + '/chats', {   // 🔥 FIXED (no /open)
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + (token || '') },
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ' + (token || '')
+        },
         body: JSON.stringify({ otherUserId: userId })
       });
     }
