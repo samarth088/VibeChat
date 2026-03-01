@@ -4,49 +4,31 @@ const User = require("../models/User");
 
 const handleChatSocket = (io, socket, onlineUsers) => {
 
-  // ================= REGISTER =================
+  // ================= REGISTER USER =================
   socket.on("register", async (userId) => {
+    try {
+      onlineUsers.set(userId.toString(), socket.id);
 
-    onlineUsers.set(userId, socket.id);
+      await User.findByIdAndUpdate(userId, {
+        isOnline: true,
+        socketId: socket.id,
+        lastSeen: null
+      });
 
-    await User.findByIdAndUpdate(userId, {
-      isOnline: true,
-      socketId: socket.id,
-      lastSeen: null
-    });
-
-    io.emit("user-online", userId);
-  });
-
-  // ================= DISCONNECT =================
-  socket.on("disconnect", async () => {
-
-    for (let [userId, sockId] of onlineUsers.entries()) {
-      if (sockId === socket.id) {
-
-        onlineUsers.delete(userId);
-
-        await User.findByIdAndUpdate(userId, {
-          isOnline: false,
-          socketId: null,
-          lastSeen: new Date()
-        });
-
-        io.emit("user-offline", {
-          userId,
-          lastSeen: new Date()
-        });
-
-        break;
-      }
+      io.emit("user-online", userId);
+    } catch (err) {
+      console.error("Register error:", err);
     }
   });
+
 
   // ================= PRIVATE MESSAGE =================
   socket.on("private-message", async ({ from, to, text }) => {
 
     try {
+      if (!from || !to || !text) return;
 
+      // 🔎 Find or create chat
       let chat = await Chat.findOne({
         members: { $all: [from, to] }
       });
@@ -61,6 +43,7 @@ const handleChatSocket = (io, socket, onlineUsers) => {
         });
       }
 
+      // 💾 Save message
       const message = await Message.create({
         chat: chat._id,
         sender: from,
@@ -69,23 +52,30 @@ const handleChatSocket = (io, socket, onlineUsers) => {
         status: "sent"
       });
 
+      // Update last message
       chat.lastMessage = message._id;
 
-      // Increase unread for receiver
+      // Increase unread count for receiver
       const currentUnread = chat.unreadCounts.get(to.toString()) || 0;
       chat.unreadCounts.set(to.toString(), currentUnread + 1);
 
       await chat.save();
 
-      const receiverSocket = onlineUsers.get(to);
+      const receiverSocket = onlineUsers.get(to.toString());
 
+      // 📤 Emit to receiver
       if (receiverSocket) {
 
         message.status = "delivered";
         message.deliveredAt = new Date();
         await message.save();
 
-        io.to(receiverSocket).emit("private-message", message);
+        io.to(receiverSocket).emit("private-message", {
+          chat: chat._id,
+          sender: from,
+          content: text,
+          createdAt: message.createdAt
+        });
 
         io.to(receiverSocket).emit("unread-update", {
           chatId: chat._id,
@@ -93,18 +83,22 @@ const handleChatSocket = (io, socket, onlineUsers) => {
         });
       }
 
-      socket.emit("message-sent", message);
+      // 📤 Emit back to sender (confirm)
+      socket.emit("message-sent", {
+        chat: chat._id,
+        content: text,
+        createdAt: message.createdAt
+      });
 
     } catch (err) {
       console.error("Private message error:", err);
     }
   });
 
+
   // ================= MESSAGE SEEN =================
   socket.on("message-seen", async (msgId) => {
-
     try {
-
       const message = await Message.findById(msgId);
       if (!message) return;
 
@@ -117,7 +111,6 @@ const handleChatSocket = (io, socket, onlineUsers) => {
       const chat = await Chat.findById(message.chat);
 
       if (chat) {
-
         chat.unreadCounts.set(message.receiver.toString(), 0);
         await chat.save();
 
@@ -140,76 +133,31 @@ const handleChatSocket = (io, socket, onlineUsers) => {
     }
   });
 
-  // ================= EDIT MESSAGE =================
-  socket.on("edit-message", async ({ msgId, newText }) => {
 
-    const message = await Message.findById(msgId);
-    if (!message) return;
+  // ================= DISCONNECT =================
+  socket.on("disconnect", async () => {
+    try {
+      for (let [userId, sockId] of onlineUsers.entries()) {
+        if (sockId === socket.id) {
 
-    message.content = newText;
-    message.isEdited = true;
-    message.editedAt = new Date();
-    await message.save();
+          onlineUsers.delete(userId);
 
-    io.emit("message-edited", message);
-  });
+          await User.findByIdAndUpdate(userId, {
+            isOnline: false,
+            socketId: null,
+            lastSeen: new Date()
+          });
 
-  // ================= DELETE MESSAGE =================
-  socket.on("delete-message", async ({ msgId, userId, forEveryone }) => {
+          io.emit("user-offline", {
+            userId,
+            lastSeen: new Date()
+          });
 
-    const message = await Message.findById(msgId);
-    if (!message) return;
-
-    if (forEveryone) {
-      message.isDeletedForEveryone = true;
-    } else {
-      message.deletedFor.push(userId);
-    }
-
-    await message.save();
-
-    io.emit("message-deleted", {
-      msgId,
-      forEveryone
-    });
-  });
-
-  // ================= REACTIONS =================
-  socket.on("react-message", async ({ msgId, userId, emoji }) => {
-
-    const message = await Message.findById(msgId);
-    if (!message) return;
-
-    const existing = message.reactions.find(
-      r => r.user.toString() === userId
-    );
-
-    if (existing) {
-      existing.emoji = emoji;
-    } else {
-      message.reactions.push({ user: userId, emoji });
-    }
-
-    await message.save();
-
-    io.emit("message-reacted", {
-      msgId,
-      reactions: message.reactions
-    });
-  });
-
-  // ================= TYPING =================
-  socket.on("typing", ({ to }) => {
-    const receiverSocket = onlineUsers.get(to);
-    if (receiverSocket) {
-      io.to(receiverSocket).emit("typing", true);
-    }
-  });
-
-  socket.on("stop-typing", ({ to }) => {
-    const receiverSocket = onlineUsers.get(to);
-    if (receiverSocket) {
-      io.to(receiverSocket).emit("typing", false);
+          break;
+        }
+      }
+    } catch (err) {
+      console.error("Disconnect error:", err);
     }
   });
 
