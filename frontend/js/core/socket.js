@@ -1,104 +1,84 @@
 // js/core/socket.js
-// FINAL SAFE VERSION
+// Minimal WebSocket client with auto-reconnect — non-module
 
 (function () {
+  const cfg = window.ENV || { WS_URL: '', DEV_MODE: true };
+  let ws = null;
+  let onMessageHandler = null;
+  let reconnectTimer = null;
+  const RECONNECT_DELAY = 2000;
 
-  const cfg = window.ENV || {};
-  let socket = null;
-
-  function getUserId() {
-    const sess = window.VibeState?.session;
-    if (!sess) return null;
-
-    // Support both structures safely
-    if (sess.id) return sess.id;
-    if (sess.user && sess.user.id) return sess.user.id;
-
-    return null;
+  function buildUrl(token) {
+    if (!cfg.WS_URL) return '';
+    return cfg.WS_URL + (token ? '?token=' + encodeURIComponent(token) : '');
   }
 
   function connect(token, onMessage) {
+    onMessageHandler = onMessage;
 
-    if (!cfg.API_URL) {
-      console.error("Socket: API_URL missing");
+    // DEV MODE — no real WebSocket, provide stubs
+    if (!cfg.WS_URL || cfg.DEV_MODE) {
+      console.info('VibeSocket: DEV_MODE — no real WebSocket.');
+      window.sendWS = function (payload) {
+        console.log('[DEV sendWS]', payload);
+        setTimeout(function () {
+          if (onMessageHandler) onMessageHandler({ type: 'echo', payload: payload });
+        }, 300);
+        return true;
+      };
+      window.VibeSocket.send     = window.sendWS;
+      window.VibeSocket.joinRoom = function (roomId) {
+        console.log('[DEV joinRoom]', roomId);
+      };
       return null;
     }
 
-    if (typeof io === "undefined") {
-      console.error("Socket.IO client not loaded.");
-      return null;
-    }
+    // Already open — skip reconnect
+    if (ws && ws.readyState === WebSocket.OPEN) return ws;
 
-    if (socket && socket.connected) {
-      return socket;
-    }
+    ws = new WebSocket(buildUrl(token));
 
-    socket = io(cfg.API_URL, {
-      auth: { token: token },
-      transports: ["websocket"]
-    });
+    ws.onopen = function () {
+      console.log('[WS] connected');
+      if (reconnectTimer) { clearTimeout(reconnectTimer); reconnectTimer = null; }
+    };
 
-    socket.on("connect", function () {
-      console.log("🟢 Socket connected:", socket.id);
+    ws.onmessage = function (e) {
+      let data = e.data;
+      try { data = JSON.parse(e.data); } catch (_) {}
+      if (onMessageHandler) onMessageHandler(data);
+    };
 
-      const userId = getUserId();
-      if (userId) {
-        socket.emit("register", userId);
-      }
-    });
+    ws.onclose = function () {
+      console.warn('[WS] closed — reconnecting in', RECONNECT_DELAY, 'ms');
+      reconnectTimer = setTimeout(function () {
+        connect(token, onMessageHandler);
+      }, RECONNECT_DELAY);
+    };
 
-    socket.on("disconnect", function () {
-      console.log("🔴 Socket disconnected");
-    });
+    ws.onerror = function (err) {
+      console.error('[WS] error', err);
+    };
 
-    socket.on("private-message", function (msg) {
-      if (onMessage) {
-        onMessage({
-          type: "private-message",
-          data: msg
-        });
-      }
-    });
+    window.sendWS = function (data) {
+      if (!ws || ws.readyState !== WebSocket.OPEN) return false;
+      try { ws.send(JSON.stringify(data)); return true; } catch (e) { return false; }
+    };
 
-    socket.on("message-sent", function (msg) {
-      if (onMessage) {
-        onMessage({
-          type: "message-sent",
-          data: msg
-        });
-      }
-    });
+    window.VibeSocket.send = window.sendWS;
+    window.VibeSocket.joinRoom = function (roomId) {
+      return window.sendWS({ type: 'join', room: roomId });
+    };
 
-    socket.on("message-seen", function (msg) {
-      if (onMessage) {
-        onMessage({
-          type: "message-seen",
-          data: msg
-        });
-      }
-    });
-
-    return socket;
+    return ws;
   }
 
-  function sendPrivateMessage(text) {
-
-    if (!socket || !socket.connected) return false;
-
-    const from = getUserId();
-    const to   = window.VibeState?.currentChat?.userId;
-
-    if (!from || !to) return false;
-
-    socket.emit("private-message", { from, to, text });
-
-    return true;
-  }
-
+  // Export
   window.VibeSocket = {
-    connect: connect,
-    sendPrivateMessage: sendPrivateMessage,
-    get socket() { return socket; }
+    connect:  connect,
+    send:     function () {},
+    joinRoom: function () {}
   };
+  window.sendWS = function () { return false; };
 
 })();
