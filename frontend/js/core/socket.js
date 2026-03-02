@@ -1,5 +1,5 @@
 // js/core/socket.js
-// Socket.IO client — production ready
+// Clean Stable Socket.IO Client
 
 (function () {
 
@@ -10,13 +10,17 @@
 
     if (!cfg.API_URL) {
       console.error("Socket: API_URL missing");
-      return;
+      return null;
     }
 
-    // Load socket.io client if not loaded
     if (typeof io === "undefined") {
-      console.error("Socket.IO client not loaded. Add CDN in app.html");
-      return;
+      console.error("Socket.IO client not loaded.");
+      return null;
+    }
+
+    // Prevent multiple connections
+    if (socket && socket.connected) {
+      return socket;
     }
 
     socket = io(cfg.API_URL, {
@@ -27,57 +31,68 @@
     socket.on("connect", function () {
       console.log("🟢 Socket connected:", socket.id);
 
-      // register user
-      if (window.VibeState.session?.user?.id) {
-        socket.emit("register", window.VibeState.session.user.id);
+      const userId = window.VibeState?.session?.user?.id;
+      if (userId) {
+        socket.emit("register", userId);
       }
-    });
-
-    socket.on("private-message", function (msg) {
-      if (onMessage) onMessage({ type: "private-message", data: msg });
-    });
-
-    socket.on("message-sent", function (msg) {
-      if (onMessage) onMessage({ type: "message-sent", data: msg });
-    });
-
-    socket.on("message-seen", function (msg) {
-      if (onMessage) onMessage({ type: "message-seen", data: msg });
     });
 
     socket.on("disconnect", function () {
       console.log("🔴 Socket disconnected");
     });
 
-    window.sendWS = function (payload) {
-      if (!socket) return false;
-
-      // Map old format to backend event
-      if (payload.type === "message") {
-        socket.emit("private-message", {
-          from: window.VibeState.session.user.id,
-          to: window.VibeState.currentChat?.userId,
-          text: payload.text
+    // ===== RECEIVE PRIVATE MESSAGE =====
+    socket.on("private-message", function (msg) {
+      if (onMessage) {
+        onMessage({
+          type: "private-message",
+          data: msg
         });
-        return true;
       }
+    });
 
-      return false;
-    };
+    // ===== MESSAGE SAVED CONFIRM =====
+    socket.on("message-sent", function (msg) {
+      if (onMessage) {
+        onMessage({
+          type: "message-sent",
+          data: msg
+        });
+      }
+    });
 
-    window.VibeSocket = {
-      connect: connect,
-      send: window.sendWS,
-      joinRoom: function () {}
-    };
+    socket.on("message-seen", function (msg) {
+      if (onMessage) {
+        onMessage({
+          type: "message-seen",
+          data: msg
+        });
+      }
+    });
 
     return socket;
   }
 
+  // ===== SEND FUNCTION =====
+  function sendPrivateMessage(text) {
+
+    if (!socket || !socket.connected) return false;
+
+    const from = window.VibeState?.session?.user?.id;
+    const to   = window.VibeState?.currentChat?.userId;
+
+    if (!from || !to) return false;
+
+    socket.emit("private-message", { from, to, text });
+
+    return true;
+  }
+
+  // ===== EXPORT GLOBAL =====
   window.VibeSocket = {
     connect: connect,
-    send: function () {},
-    joinRoom: function () {}
+    get socket() { return socket; },
+    sendPrivateMessage: sendPrivateMessage
   };
 
 })();
