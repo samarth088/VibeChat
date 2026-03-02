@@ -20,9 +20,7 @@
 
   window.VibeAPI = {
 
-    // ─────────────────────────────────────────
-    // LOGIN
-    // ─────────────────────────────────────────
+    // ================= LOGIN =================
     login: function (data) {
       return fetchJSON(cfg.API_URL + '/auth/login', {
         method: 'POST',
@@ -34,9 +32,7 @@
       });
     },
 
-    // ─────────────────────────────────────────
-    // SEND OTP
-    // ─────────────────────────────────────────
+    // ================= SEND OTP =================
     sendOTP: function (email) {
       if (!email) return Promise.reject(new Error("Email is required"));
       return fetchJSON(cfg.API_URL + '/auth/send-otp', {
@@ -46,9 +42,7 @@
       });
     },
 
-    // ─────────────────────────────────────────
-    // VERIFY OTP + SIGNUP
-    // ─────────────────────────────────────────
+    // ================= VERIFY OTP + SIGNUP =================
     verifyOTPAndSignup: function (data) {
       return fetchJSON(cfg.API_URL + '/auth/verify-otp', {
         method: 'POST',
@@ -70,9 +64,7 @@
       });
     },
 
-    // ─────────────────────────────────────────
-    // SEARCH USERS
-    // ─────────────────────────────────────────
+    // ================= SEARCH USERS =================
     searchUsers: function (query) {
       if (!query) return Promise.resolve([]);
 
@@ -87,7 +79,7 @@
         return [{
           userId:   res.user.id,
           uid:      res.user.uid,
-          idFormatted: res.user.uid,   // 🔥 FIXED — no more #00000
+          idFormatted: res.user.uid,
           name:     res.user.name,
           username: res.user.username || res.user.name,
           avatar:   res.user.avatar || '',
@@ -96,26 +88,38 @@
       });
     },
 
-    // ─────────────────────────────────────────
-    // GET USER BY ID
-    // ─────────────────────────────────────────
+    // ================= GET USER BY ID =================
     getUserById: function (userId) {
       return fetchJSON(cfg.API_URL + '/users/' + encodeURIComponent(userId), {
         headers: authHeader()
       });
     },
 
-    // ─────────────────────────────────────────
-    // OPEN CHAT (FIXED ENDPOINT)
-    // ─────────────────────────────────────────
+    // ================= OPEN CHAT =================
     openChatWith: function (userId, token) {
-      return fetchJSON(cfg.API_URL + '/chats', {   // 🔥 FIXED (no /open)
+      return fetchJSON(cfg.API_URL + '/chats', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer ' + (token || '')
         },
         body: JSON.stringify({ otherUserId: userId })
+      });
+    },
+
+    // ================= GET USER CHATS 🔥 =================
+    getUserChats: function () {
+      return fetchJSON(cfg.API_URL + '/chats', {
+        method: 'GET',
+        headers: authHeader()
+      });
+    },
+
+    // ================= GET CHAT MESSAGES 🔥 =================
+    getChatMessages: function (chatId) {
+      return fetchJSON(cfg.API_URL + '/chats/' + encodeURIComponent(chatId) + '/messages', {
+        method: 'GET',
+        headers: authHeader()
       });
     }
 
