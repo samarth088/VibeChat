@@ -34,22 +34,41 @@
       overflow-y: auto;
       overflow-x: hidden;
     }
-    .group-content,
-    .calls-content {
-      flex: 1;
-      overflow-y: auto;
-    }
   </style>
 </head>
 
 <body>
 
 <div class="phone">
-  <!-- (⚠️ UI content unchanged — exactly same as your version) -->
 
-  <!-- ── Scripts ── -->
+  <!-- HEADER -->
+  <div class="header">
+    <div class="header-left">
+      <div class="profile-avatar-big">V</div>
+    </div>
+    <div class="header-title">VibeChat</div>
+    <div class="header-right">
+      <button onclick="openSearch()">Search</button>
+    </div>
+  </div>
 
-<!-- Socket.IO CDN MUST be before socket.js -->
+  <!-- DM LIST -->
+  <div id="dmContent">
+    <div id="dmEmpty" style="text-align:center;padding:40px;color:rgba(255,255,255,0.4);">
+      No conversations yet
+    </div>
+  </div>
+
+  <!-- BOTTOM NAV -->
+  <div class="bottom-nav">
+    <button onclick="switchTab('dm')">DM</button>
+    <button onclick="switchTab('group')">Group</button>
+    <button onclick="switchTab('calls')">Calls</button>
+  </div>
+
+</div>
+
+<!-- Socket.IO CDN -->
 <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
 
 <script src="config/env.js"></script>
@@ -57,26 +76,7 @@
 <script src="js/core/api.js"></script>
 <script src="js/core/socket.js"></script>
 
-<script src="js/utils/format.js"></script>
-<script src="js/utils/time.js"></script>
-<script src="js/utils/validators.js"></script>
-
-<script src="js/ui/header.js"></script>
-<script src="js/ui/overlays.js"></script>
-<script src="js/ui/bottomNav.js"></script>
-
 <script src="js/pages/chat.js"></script>
-<script src="js/pages/group.js"></script>
-<script src="js/pages/calls.js"></script>
-
-<script>
-  initHeader();
-
-  function handleSignOut() {
-    if (window.VibeState) window.VibeState.clearSession();
-    window.location.replace('./index.html');
-  }
-</script>
 
 </body>
 </html>
