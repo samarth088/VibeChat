@@ -1,26 +1,18 @@
 /* =============================================
    base.css — Reset, Variables, Starfield, Phone Shell
    ============================================= */
+
 * {
   margin: 0;
   padding: 0;
   box-sizing: border-box;
 }
 
-html {
-  height: 100%;
-  overflow: hidden;
-}
-
 body {
-  height: 100%;
-  overflow: hidden;
+  min-height: 100vh;
   font-family: 'Segoe UI', sans-serif;
   background-color: #000a1a;
   background-image: radial-gradient(ellipse at 50% 50%, #001433 0%, #000510 70%);
-  display: flex;
-  align-items: center;
-  justify-content: center;
 }
 
 /* Starfield */
@@ -43,36 +35,21 @@ body::before {
   z-index: 0;
 }
 
-/* ── Phone Shell ──
-   Mobile: fullscreen (koi card nahi)
-   Desktop (500px+): 375×812 card with rounded corners
-   ─────────────────────────────────── */
+/* Phone shell */
 .phone {
-  width: 100vw;
-  height: 100vh;
-  max-width: 100vw;
-  border-radius: 0;
-  border: none;
+  width: 375px;
+  height: 812px;
+  background: linear-gradient(160deg, #000d24 0%, #000510 100%);
+  border-radius: 44px;
+  border: 2px solid #1a2540;
   overflow: hidden;
   position: relative;
   display: flex;
   flex-direction: column;
-  background: linear-gradient(160deg, #000d24 0%, #000510 100%);
   box-shadow:
     0 0 60px rgba(0,80,255,0.15),
     0 0 120px rgba(0,40,120,0.1),
     inset 0 0 40px rgba(0,20,60,0.5);
-  z-index: 1;
-}
-
-@media (min-width: 500px) {
-  .phone {
-    width: 375px;
-    height: 812px;
-    max-width: 375px;
-    border-radius: 44px;
-    border: 2px solid #1a2540;
-  }
 }
 
 /* Status bar */
@@ -84,7 +61,6 @@ body::before {
   color: #ffffff;
   font-size: 14px;
   font-weight: 600;
-  flex-shrink: 0;
 }
 
 .status-icons {
