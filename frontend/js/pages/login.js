@@ -16,32 +16,43 @@ document.addEventListener('DOMContentLoaded', function () {
     var identifier = (formData.get('identifier') || '').trim();
     var password   = formData.get('password') || '';
 
-    if (!identifier || !password) { showError('Please fill in all fields.'); return; }
-    if (password.length < 6) { showError('Password must be at least 6 characters.'); return; }
+    if (!identifier || !password) {
+      showError('Please fill in all fields.');
+      return;
+    }
+    if (password.length < 6) {
+      showError('Password must be at least 6 characters.');
+      return;
+    }
 
     setLoading(true);
 
     try {
-      var response = await window.VibeAPI.login({ identifier, password });
+      var response = await window.VibeAPI.login({
+        identifier: identifier,
+        password:   password
+      });
 
-      // Backend returns: { token, user: { id, uid, name, username, email, avatar } }
+      // ── FIX: response.user aata hai backend se ──
+      // auth.controller.js returns: { token, user: { id, uid, username, email, avatar } }
       var userData = response.user || {};
 
-      // ✅ FIX: uid directly save — "vibe_a3f9k2" format
       var session = {
-        userId:      userData.id       || '',
-        uid:         userData.uid      || '',
-        idFormatted: userData.uid      || '',
-        name:        userData.name     || '',
+        userId:      userData.id   || response.userId,
+        uid:         userData.uid  || '',          // ← vibe_a3f9k2 format
+        idFormatted: userData.uid  || '',          // display ke liye same uid
         username:    userData.username || userData.email || identifier,
-        email:       userData.email    || identifier,
-        avatar:      userData.avatar   || '',
-        token:       response.token    || '',
-        profile:     response.profile  || {}
+        email:       userData.email || identifier,
+        avatar:      userData.avatar || '',
+        token:       response.token || '',
+        profile:     response.profile || {}
       };
 
       window.VibeState.saveSession(session);
-      setTimeout(function () { window.location.assign('./app.html'); }, 50);
+
+      setTimeout(function () {
+        window.location.assign('./app.html');
+      }, 50);
 
     } catch (err) {
       setLoading(false);
