@@ -189,3 +189,7 @@ openChatWith: function (userId, token) {
   });
 
 },
+    // CLOSE VibeAPI OBJECT
+  };
+
+})();
