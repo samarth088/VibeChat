@@ -104,33 +104,28 @@ login: function (data) {
     // ─────────────────────────────────────────
     searchUsers: function (query) {
 
-      if (!query) return Promise.resolve([]);
+  if (!query) return Promise.resolve([]);
 
-      var q = String(query).trim();
+  var q = String(query).trim();
 
-      if (cfg.DEV_MODE) {
-        var id = Math.floor(Math.random() * 90000) + 1;
-        return Promise.resolve([{
-          userId:      id,
-          idFormatted: window.VibeState.formatId(id),
-          username:    q + '_sample',
-          online:      true
-        }]);
-      }
+  return fetchJSON(cfg.API_URL + '/users/search?uid=' + encodeURIComponent(q), {
+    headers: {
+      'Authorization': 'Bearer ' + (window.VibeState.session?.token || '')
+    }
+  }).then(function (res) {
 
-      return fetchJSON(cfg.API_URL + '/users/search?uid=' + encodeURIComponent(q), {
-        headers: {
-          'Authorization': 'Bearer ' + (window.VibeState.session?.token || '')
-        }
-      }).then(function (res) {
-        if (!res.success || !res.user) return [];
-        return [{
-          userId:   res.user.id,
-          username: res.user.username || res.user.name,
-          online:   true
-        }];
-      });
-    },
+    if (!res.success || !res.user) return [];
+
+    return [{
+      userId:   res.user.id,
+      uid:      res.user.uid,
+      username: res.user.username || res.user.name,
+      avatar:   res.user.avatar || '',
+      online:   res.user.online || false
+    }];
+
+  });
+},
 
     // ─────────────────────────────────────────
     // GET USER BY ID
