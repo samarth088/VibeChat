@@ -28,33 +28,33 @@
     // ─────────────────────────────────────────
     login: function (data) {
 
-      var email    = data.identifier;
-      var password = data.password;
+  var identifier = data.identifier;
+  var password   = data.password;
 
-      if (cfg.DEV_MODE) {
-        return new Promise(function (resolve) {
-          setTimeout(function () {
-            var userId = Math.floor(Math.random() * 90000) + 1;
-            resolve({
-              userId:      userId,
-              idFormatted: window.VibeState.formatId(userId),
-              username:    email,
-              token:       'dev-token-' + userId,
-              profile:     { bio: '🚀 Living on vibes.' }
-            });
-          }, 600);
+  if (cfg.DEV_MODE) {
+    return new Promise(function (resolve) {
+      setTimeout(function () {
+        var userId = Math.floor(Math.random() * 90000) + 1;
+        resolve({
+          userId:      userId,
+          idFormatted: window.VibeState.formatId(userId),
+          username:    identifier,
+          token:       'dev-token-' + userId,
+          profile:     { bio: '🚀 Living on vibes.' }
         });
-      }
+      }, 600);
+    });
+  }
 
-      return fetchJSON(cfg.API_URL + '/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          email: email,
-          password: password
-        })
-      });
-    },
+  return fetchJSON(cfg.API_URL + '/auth/login', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      identifier: identifier,
+      password: password
+    })
+  });
+},
 
     // ─────────────────────────────────────────
     // SEND OTP
