@@ -5,81 +5,94 @@ const Message = require("../models/Message");
 exports.createOrGetChat = async (req, res, next) => {
   try {
 
-    const currentUserId = req.user._id;  // ✅ FIX
+    const currentUserId = req.user._id;
     const { otherUserId } = req.body;
 
     if (!otherUserId) {
-      return res.status(400).json({ message: "Other user ID required" });
+      return res.status(400).json({
+        success:false,
+        message:"Other user ID required"
+      });
     }
 
     let chat = await Chat.findOne({
-      members: { $all: [currentUserId, otherUserId] }
+      members:{ $all:[currentUserId, otherUserId] }
     });
 
     if (!chat) {
       chat = await Chat.create({
-        members: [currentUserId, otherUserId],
-        unreadCounts: {
-          [currentUserId]: 0,
-          [otherUserId]: 0
+        members:[currentUserId, otherUserId],
+        unreadCounts:{
+          [currentUserId]:0,
+          [otherUserId]:0
         }
       });
     }
 
-    res.json(chat);
+    return res.json({
+      success:true,
+      roomId:chat._id
+    });
 
-  } catch (err) {
+  } catch(err){
     next(err);
   }
 };
 
 
 // GET USER CHATS
-exports.getUserChats = async (req, res, next) => {
-  try {
+exports.getUserChats = async (req,res,next)=>{
+  try{
 
-    const currentUserId = req.user._id; // ✅ FIX
+    const currentUserId = req.user._id;
 
     const chats = await Chat.find({
-      members: currentUserId
+      members:currentUserId
     })
-      .populate("members", "username avatar isOnline lastSeen uid")
-      .populate("lastMessage")
-      .sort({ updatedAt: -1 });
+    .populate("members","username avatar uid isOnline")
+    .populate("lastMessage")
+    .sort({updatedAt:-1});
 
-    const formatted = chats.map(chat => {
+    const formatted = chats.map(chat=>{
 
       const otherUser = chat.members.find(
         m => m._id.toString() !== currentUserId.toString()
       );
 
-      return {
-        _id: chat._id,
-        user: otherUser,
-        lastMessage: chat.lastMessage,
-        unread: chat.unreadCounts?.[currentUserId] || 0
+      return{
+        _id:chat._id,
+        user:otherUser,
+        lastMessage:chat.lastMessage,
+        unread:chat.unreadCounts?.[currentUserId] || 0
       };
+
     });
 
-    res.json(formatted);
+    res.json({
+      success:true,
+      chats:formatted
+    });
 
-  } catch (err) {
+  }catch(err){
     next(err);
   }
 };
 
 
 // GET CHAT MESSAGES
-exports.getChatMessages = async (req, res, next) => {
-  try {
+exports.getChatMessages = async (req,res,next)=>{
+  try{
 
     const messages = await Message.find({
-      chat: req.params.chatId
-    }).sort({ createdAt: 1 });
+      chat:req.params.chatId
+    }).sort({createdAt:1});
 
-    res.json(messages);
+    res.json({
+      success:true,
+      messages
+    });
 
-  } catch (err) {
+  }catch(err){
     next(err);
   }
 };
