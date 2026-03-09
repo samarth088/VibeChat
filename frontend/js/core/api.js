@@ -129,47 +129,63 @@ login: function (data) {
 
     // ─────────────────────────────────────────
     // GET USER BY ID
-    // ─────────────────────────────────────────
-    getUserById: function (userId) {
+getUserById: function (userId) {
 
-      if (cfg.DEV_MODE) {
-        return Promise.resolve({
-          userId:      userId,
-          idFormatted: window.VibeState.formatId(userId),
-          username:    'user_' + userId,
-          bio:         'Dev user'
-        });
-      }
+  if (cfg.DEV_MODE) {
+    return Promise.resolve({
+      userId:      userId,
+      idFormatted: window.VibeState.formatId(userId),
+      username:    'user_' + userId,
+      bio:         'Dev user'
+    });
+  }
 
-      return fetchJSON(cfg.API_URL + '/users/' + encodeURIComponent(userId), {
-        headers: {
-          'Authorization': 'Bearer ' + (window.VibeState.session?.token || '')
-        }
-      });
-    },
+  return fetchJSON(cfg.API_URL + '/users/search?uid=' + encodeURIComponent(userId), {
+    headers: {
+      'Authorization': 'Bearer ' + (window.VibeState.session?.token || '')
+    }
+  }).then(function(res){
 
-    // ─────────────────────────────────────────
+    if(!res.success || !res.user) throw new Error("User not found");
+
+    return {
+      userId:   res.user.id,
+      uid:      res.user.uid,
+      username: res.user.username,
+      avatar:   res.user.avatar
+    };
+
+  });
+
+},
     // OPEN CHAT
-    // ─────────────────────────────────────────
-    openChatWith: function (userId, token) {
+openChatWith: function (userId, token) {
 
-      if (cfg.DEV_MODE) {
-        return Promise.resolve({
-          roomId:       'room_' + Math.floor(Math.random() * 1000000),
-          participants: [userId]
-        });
-      }
+  if (cfg.DEV_MODE) {
+    return Promise.resolve({
+      roomId: 'room_' + Math.floor(Math.random() * 1000000)
+    });
+  }
 
-      return fetchJSON(cfg.API_URL + '/chats/open', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer ' + (token || '')
-        },
-        body: JSON.stringify({ otherUserId: userId })
-      });
+  return fetchJSON(cfg.API_URL + '/chats', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': 'Bearer ' + (token || '')
+    },
+    body: JSON.stringify({
+      otherUserId: userId
+    })
+  }).then(function(res){
+
+    if(!res.roomId){
+      throw new Error("Chat creation failed");
     }
 
-  };
+    return {
+      roomId: res.roomId
+    };
 
-})();
+  });
+
+},
