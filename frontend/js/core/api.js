@@ -26,7 +26,8 @@
     // ─────────────────────────────────────────
     // LOGIN
     // ─────────────────────────────────────────
-    login: function (data) {
+    
+login: function (data) {
 
   var identifier = data.identifier;
   var password   = data.password;
@@ -50,12 +51,11 @@
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      identifier: identifier,
+      email: identifier,   // 🔥 FIX
       password: password
     })
   });
 },
-
     // ─────────────────────────────────────────
     // SEND OTP
     // ─────────────────────────────────────────
