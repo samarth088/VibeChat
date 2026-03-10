@@ -103,7 +103,7 @@
 
         var btn = row.querySelector('button[data-id]');
         btn.addEventListener('click', function () {
-          var id = Number(this.getAttribute('data-id'));
+          var id = this.getAttribute('data-id');
           if (window.openChatFromSearch) window.openChatFromSearch(id);
           window.closeSheet(null, 'searchSheet');
         });
