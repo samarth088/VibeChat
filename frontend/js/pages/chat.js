@@ -207,17 +207,48 @@
   }
 
   // ── From search ────────────────────────────────────────────
-  window.openChatFromSearch = async function(userId) {
-    try {
-      var user   = await window.VibeAPI.getUserById(userId);
-      var sess   = window.VibeState.session;
-      var open   = await window.VibeAPI.openChatWith(userId, sess&&sess.token);
-      var roomId = open.roomId||('room_'+userId);
-      window.VibeState.currentChat = { roomId:roomId, userId:userId, username:user.username };
-      addOrFocusConversation(user, roomId);
-      window.switchTab('dm');
-    } catch(e){ console.error('[Chat]', e); }
-  };
+  // ── From search ────────────────────────────────────────────
+window.openChatFromSearch = async function(userObj) {
+
+  try {
+
+    // Safety check
+    if (!userObj || !userObj.userId) {
+      console.error("Invalid user object");
+      return;
+    }
+
+    var sess = window.VibeState.session;
+
+    // Create / get chat from backend
+    var open = await window.VibeAPI.openChatWith(
+      userObj.userId,
+      sess && sess.token
+    );
+
+    var roomId = open.roomId || ('room_' + userObj.userId);
+
+    // Store current chat
+    window.VibeState.currentChat = {
+      roomId: roomId,
+      userId: userObj.userId,
+      username: userObj.username
+    };
+
+    // Create conversation in DM list
+    addOrFocusConversation(userObj, roomId);
+
+    // Switch to DM tab
+    if (window.switchTab) window.switchTab('dm');
+
+  }
+  catch (e) {
+
+    console.error('[Chat open error]', e);
+
+  }
+
+};
 
   // ── Startup ────────────────────────────────────────────────
   document.addEventListener('DOMContentLoaded', function() {
