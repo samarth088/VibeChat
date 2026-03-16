@@ -52,7 +52,7 @@ app.use((req, res) => {
     error: "Route not found"
   });
 });
-
+app.use("/api/messages", require("./routes/message.routes"));
 // ================= ERROR HANDLER =================
 // (Must be last)
 
