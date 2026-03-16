@@ -145,13 +145,15 @@
     if (!msgStore[roomId]) msgStore[roomId] = [];
     msgStore[roomId].push({ text:text, isMe:true, time:nowTime() });
 
-    var sess = window.VibeState.session;
+    var sess = window.VibeState.loadSession();
 
 window.VibeAPI.sendMessage(
   roomId,
   text,
-  sess.token
-).catch(console.error);
+  sess && sess.token
+).catch(function(err){
+  console.error("Send message error:", err);
+});
 
     // Update DM list preview + move to top
     var preview = qs('[data-userid="'+userObj.userId+'"] .conv-preview');
