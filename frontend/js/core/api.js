@@ -23,6 +23,21 @@
 
   window.VibeAPI = {
 
+   sendMessage: function(chatId,text,token){
+
+  return fetchJSON(cfg.API_URL + "/messages",{
+    method:"POST",
+    headers:{
+      "Content-Type":"application/json",
+      "Authorization":"Bearer "+token
+    },
+    body:JSON.stringify({
+      chatId:chatId,
+      text:text
+    })
+  });
+
+},
     // ─────────────────────────────────────────
     // LOGIN
     // ─────────────────────────────────────────
