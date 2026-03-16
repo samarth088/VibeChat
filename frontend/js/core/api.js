@@ -25,19 +25,18 @@
 
    sendMessage: function(chatId,text,token){
 
+  // 🔥 Token safety fix
+  if(!token){
+    var sess = window.VibeState.loadSession();
+    token = sess && sess.token;
+  }
+
   return fetchJSON(cfg.API_URL + "/messages",{
     method:"POST",
     headers:{
       "Content-Type":"application/json",
-      "Authorization":"Bearer "+token
+      "Authorization":"Bearer " + token
     },
-    body:JSON.stringify({
-      chatId:chatId,
-      text:text
-    })
-  });
-
-},
     // ─────────────────────────────────────────
     // LOGIN
     // ─────────────────────────────────────────
