@@ -15,16 +15,32 @@ exports.sendMessage = async (req,res,next)=>{
       });
     }
 
+    // Find chat
+    const chat = await Chat.findById(chatId);
+
+    if(!chat){
+      return res.status(404).json({
+        success:false,
+        message:"Chat not found"
+      });
+    }
+
+    // Detect receiver
+    const receiver = chat.members.find(
+      m => m.toString() !== sender.toString()
+    );
+
     const message = await Message.create({
-      chat:chatId,
-      sender,
-      text
+      chat: chatId,
+      sender: sender,
+      receiver: receiver,
+      content: text
     });
 
-    await Chat.findByIdAndUpdate(chatId,{
-      lastMessage:message._id,
-      updatedAt:new Date()
-    });
+    // Update chat
+    chat.lastMessage = message._id;
+    chat.updatedAt = new Date();
+    await chat.save();
 
     res.json({
       success:true,
