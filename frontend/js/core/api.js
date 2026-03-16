@@ -25,7 +25,7 @@
 
    sendMessage: function(chatId,text,token){
 
-  // 🔥 Token safety fix
+  // Token safety fix
   if(!token){
     var sess = window.VibeState.loadSession();
     token = sess && sess.token;
@@ -37,6 +37,13 @@
       "Content-Type":"application/json",
       "Authorization":"Bearer " + token
     },
+    body: JSON.stringify({
+      chatId: chatId,
+      text: text
+    })
+  });
+
+},
     // ─────────────────────────────────────────
     // LOGIN
     // ─────────────────────────────────────────
