@@ -83,7 +83,7 @@
     phone.appendChild(page);
 
     // Render existing messages
-    _renderMsgs(roomId);
+    loadMessages(roomId);
 
     // Back → remove page
     qid('chatBackBtn').addEventListener('click', function() {
@@ -101,6 +101,45 @@
     // Join socket room
     if (window.VibeSocket && window.VibeSocket.joinRoom) window.VibeSocket.joinRoom(roomId);
   }
+//_____________________
+  async function loadMessages(roomId){
+
+  try{
+
+    var sess = window.VibeState.loadSession();
+
+    var res = await fetch(
+      window.ENV.API_URL + "/chats/" + roomId + "/messages",
+      {
+        headers:{
+          "Authorization":"Bearer " + (sess && sess.token)
+        }
+      }
+    );
+
+    var data = await res.json();
+
+    if(!data.success) return;
+
+    msgStore[roomId] = data.messages.map(function(m){
+      return {
+        text: m.content,
+        isMe: String(m.sender) === String(sess.userId),
+        time: new Date(m.createdAt).toLocaleTimeString([],{
+          hour:'2-digit',
+          minute:'2-digit'
+        })
+      };
+    });
+
+    _renderMsgs(roomId);
+
+  }
+  catch(e){
+    console.error("Load messages error:", e);
+  }
+
+}
 
   // ── Render messages ────────────────────────────────────────
   function _renderMsgs(roomId) {
