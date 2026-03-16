@@ -44,7 +44,7 @@ app.use("/api/auth", authRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/chats", chatRoutes);
 app.use("/api/groups", groupRoutes);
-
+app.use("/api/messages", require("./routes/message.routes"));
 // ================= 404 HANDLER =================
 
 app.use((req, res) => {
@@ -52,7 +52,6 @@ app.use((req, res) => {
     error: "Route not found"
   });
 });
-app.use("/api/messages", require("./routes/message.routes"));
 // ================= ERROR HANDLER =================
 // (Must be last)
 
