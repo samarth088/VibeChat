@@ -286,19 +286,28 @@
       });
 
       var data = await res.json();
-      if (!res.ok) return;
 
-      var messages = data.messages || [];
+      if (!res.ok) {
+        console.error("Messages fetch failed:", data);
+        return;
+      }
 
-      msgStore[roomId] = messages.map(function (m) {
-        var senderId = String(m.sender && (m.sender._id || m.sender.id || m.sender));
-        var myId = String(sess.userId);
+      var myId = String(sess.userId);
+
+      msgStore[roomId] = (data.messages || []).map(function (m) {
+        var senderId =
+          typeof m.sender === "object"
+            ? String(m.sender._id || m.sender.id || "")
+            : String(m.sender || "");
 
         return {
           id: m._id,
           text: m.content,
           isMe: senderId === myId,
-          time: formatTime(m.createdAt),
+          time: new Date(m.createdAt).toLocaleTimeString([], {
+            hour: "2-digit",
+            minute: "2-digit"
+          }),
           status: m.status || "sent",
           createdAt: m.createdAt
         };
@@ -320,25 +329,47 @@
       el.remove();
     });
 
+    function getTick(status) {
+      return status === "seen" ? "✓✓" : "✓";
+    }
+
     (msgStore[roomId] || []).forEach(function (msg) {
       var row = document.createElement("div");
       row.className = "msg-row";
-      row.style.cssText = "display:flex;" + (msg.isMe ? "justify-content:flex-end;" : "justify-content:flex-start;");
+      row.style.cssText =
+        "display:flex;" +
+        (msg.isMe ? "justify-content:flex-end;" : "justify-content:flex-start;");
 
       row.innerHTML =
         '<div style="' +
-          "max-width:75%;min-width:60px;" +
-          "padding:8px 12px 6px;" +
-          "border-radius:" + (msg.isMe ? "16px 16px 3px 16px" : "16px 16px 16px 3px") + ";" +
-          "background:" + (msg.isMe ? "linear-gradient(135deg,#0065cc,#0045aa)" : "rgba(255,255,255,0.07)") + ";" +
-          "border:1px solid " + (msg.isMe ? "rgba(0,120,255,0.25)" : "rgba(255,255,255,0.07)") + ";" +
-          "color:#fff;font-size:14px;line-height:1.45;word-break:break-word;" +
+        "max-width:75%;min-width:60px;" +
+        "padding:8px 12px 6px;" +
+        "border-radius:" +
+        (msg.isMe ? "16px 16px 3px 16px" : "16px 16px 16px 3px") +
+        ";" +
+        "background:" +
+        (msg.isMe
+          ? "linear-gradient(135deg,#0065cc,#0045aa)"
+          : "rgba(255,255,255,0.07)") +
+        ";" +
+        "border:1px solid " +
+        (msg.isMe
+          ? "rgba(0,120,255,0.25)"
+          : "rgba(255,255,255,0.07)") +
+        ";" +
+        "color:#fff;font-size:14px;line-height:1.45;word-break:break-word;" +
         '">' +
-          "<div>" + esc(msg.text) + "</div>" +
-          '<div style="font-size:10px;color:rgba(255,255,255,0.45);margin-top:3px;text-align:right;display:flex;align-items:center;justify-content:flex-end;gap:4px;">' +
-            esc(msg.time) +
-            (msg.isMe ? '<span style="color:rgba(100,180,255,0.8);">' + tickFor(msg.status) + "</span>" : "") +
-          "</div>" +
+        "<div>" +
+        esc(msg.text) +
+        "</div>" +
+        '<div style="font-size:10px;color:rgba(255,255,255,0.38);margin-top:3px;text-align:right;display:flex;align-items:center;justify-content:flex-end;gap:3px;">' +
+        msg.time +
+        (msg.isMe
+          ? '<span style="color:rgba(100,180,255,0.7);">' +
+            getTick(msg.status) +
+            "</span>"
+          : "") +
+        "</div>" +
         "</div>";
 
       area.appendChild(row);
@@ -365,7 +396,11 @@
       });
 
       var data = await res.json();
-      if (!res.ok) throw new Error(data.message || "Send failed");
+
+      if (!res.ok) {
+        console.error("Send message failed:", data);
+        return;
+      }
 
       var m = data.message;
 
@@ -375,22 +410,40 @@
         id: m._id,
         text: m.content,
         isMe: true,
-        time: formatTime(m.createdAt),
+        time: new Date(m.createdAt).toLocaleTimeString([], {
+          hour: "2-digit",
+          minute: "2-digit"
+        }),
         status: m.status || "sent",
         createdAt: m.createdAt
       });
 
-      if (input) input.value = "";
+      var preview = qs('[data-userid="' + userObj.userId + '"] .conv-preview');
+      if (preview) preview.textContent = text;
 
-      _renderMsgs(roomId);
-      await refreshDMList();
-
-      if (window.VibeSocket && window.VibeSocket.sendMessage) {
-        window.VibeSocket.sendMessage({
-          roomId: roomId,
-          text: text
+      var timeEl = qs('[data-userid="' + userObj.userId + '"] .conv-time');
+      if (timeEl) {
+        timeEl.textContent = new Date(m.createdAt).toLocaleTimeString([], {
+          hour: "2-digit",
+          minute: "2-digit"
         });
       }
+
+      var dmList = qid("dmContent");
+      var item = qs('[data-userid="' + userObj.userId + '"]');
+      if (dmList && item) dmList.insertBefore(item, dmList.firstChild);
+
+      if (input) input.value = "";
+
+      var btn = qid("chatSendBtn");
+      if (btn) {
+        btn.style.transform = "scale(0.88)";
+        setTimeout(function () {
+          btn.style.transform = "";
+        }, 120);
+      }
+
+      _renderMsgs(roomId);
     } catch (err) {
       console.error("Send message error:", err);
     }
