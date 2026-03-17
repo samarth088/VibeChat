@@ -12,8 +12,10 @@
   }
 
   function nowTime() {
-    var n = new Date();
-    return n.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+    return new Date().toLocaleTimeString([], {
+      hour: "2-digit",
+      minute: "2-digit"
+    });
   }
 
   function formatTime(date) {
@@ -42,6 +44,8 @@
   var msgStore = {};
   var chatMeta = {};
   var currentRoomId = null;
+  var activePoll = null;
+  var isSending = false;
 
   function getSession() {
     return window.VibeState && window.VibeState.loadSession
@@ -55,8 +59,14 @@
     });
 
     qsa(".profile-uid").forEach(function (el) {
-      var idText = sess.idFormatted || (window.VibeState && window.VibeState.formatId ? window.VibeState.formatId(sess.userId) : sess.userId);
-      el.textContent = (sess.username ? "@" + sess.username + " · " : "") + "ID: " + idText;
+      var idText =
+        sess.idFormatted ||
+        (window.VibeState && window.VibeState.formatId
+          ? window.VibeState.formatId(sess.userId)
+          : sess.userId);
+
+      el.textContent =
+        (sess.username ? "@" + sess.username + " · " : "") + "ID: " + idText;
     });
 
     var av = qs(".profile-avatar-big");
@@ -107,7 +117,7 @@
       username: username,
       isOnline: !!(otherUser && otherUser.isOnline),
       lastSeenAt: otherUser ? otherUser.lastSeenAt : null,
-      unreadCount: raw.unreadCount || 0,
+      unreadCount: raw.unreadCount || raw.unread || 0,
       preview:
         (raw.lastMessage && (raw.lastMessage.content || raw.lastMessage.text)) ||
         raw.preview ||
@@ -153,9 +163,9 @@
         "</div>" +
         '<div class="conv-meta">' +
           '<div style="display:flex;align-items:center;gap:5px">' +
-            '<span class="conv-time">' + esc(chat.time ? formatTime(chat.time) : "Now") + "</span>" +
+            '<span class="conv-time">' + esc(chat.time ? formatTime(chat.time) : "Now") + "</span>' +
             (chat.isOnline ? '<div class="online-dot"></div>' : "") +
-          "</div>" +
+          '</div>' +
           (chat.unreadCount > 0
             ? '<div class="unread-count">' + chat.unreadCount + "</div>"
             : "") +
@@ -211,6 +221,50 @@
     }
   }
 
+  function startPolling(roomId) {
+    stopPolling();
+
+    activePoll = setInterval(async function () {
+      if (!roomId || currentRoomId !== roomId) return;
+      await syncMessages(roomId, true);
+    }, 2000);
+  }
+
+  function stopPolling() {
+    if (activePoll) {
+      clearInterval(activePoll);
+      activePoll = null;
+    }
+  }
+
+  function mergeMessages(roomId, incoming) {
+    var existing = msgStore[roomId] || [];
+    var map = {};
+
+    existing.forEach(function (m) {
+      var key = m.id || m.tempId;
+      if (key) map[key] = m;
+    });
+
+    incoming.forEach(function (m) {
+      if (m.id && map[m.id]) {
+        map[m.id] = Object.assign({}, map[m.id], m, { pending: false, failed: false });
+      } else {
+        map[m.id || ("tmp_" + Math.random())] = m;
+      }
+    });
+
+    var merged = Object.keys(map).map(function (k) {
+      return map[k];
+    });
+
+    merged.sort(function (a, b) {
+      return new Date(a.createdAt || 0) - new Date(b.createdAt || 0);
+    });
+
+    msgStore[roomId] = merged;
+  }
+
   function openChatPage(userObj, roomId) {
     var phone = qs(".phone");
     if (!phone) return;
@@ -256,9 +310,11 @@
     phone.appendChild(page);
 
     renderUserStatus(userObj);
-    loadMessages(roomId);
+    syncMessages(roomId, false);
+    startPolling(roomId);
 
     qid("chatBackBtn").addEventListener("click", function () {
+      stopPolling();
       page.remove();
     });
 
@@ -267,15 +323,14 @@
     });
 
     qid("chatInput").addEventListener("keydown", function (e) {
-      if (e.key === "Enter") _send(roomId, userObj);
+      if (e.key === "Enter") {
+        e.preventDefault();
+        _send(roomId, userObj);
+      }
     });
-
-    if (window.VibeSocket && window.VibeSocket.joinRoom) {
-      window.VibeSocket.joinRoom(roomId);
-    }
   }
 
-  async function loadMessages(roomId) {
+  async function syncMessages(roomId, silent) {
     try {
       var sess = getSession();
 
@@ -294,7 +349,7 @@
 
       var myId = String(sess.userId);
 
-      msgStore[roomId] = (data.messages || []).map(function (m) {
+      var incoming = (data.messages || []).map(function (m) {
         var senderId =
           typeof m.sender === "object"
             ? String(m.sender._id || m.sender.id || "")
@@ -304,20 +359,23 @@
           id: m._id,
           text: m.content,
           isMe: senderId === myId,
-          time: new Date(m.createdAt).toLocaleTimeString([], {
-            hour: "2-digit",
-            minute: "2-digit"
-          }),
+          time: formatTime(m.createdAt),
           status: m.status || "sent",
-          createdAt: m.createdAt
+          createdAt: m.createdAt,
+          pending: false,
+          failed: false
         };
       });
 
+      mergeMessages(roomId, incoming);
       _renderMsgs(roomId);
       await markSeen(roomId);
-      await refreshDMList();
+
+      if (!silent) {
+        await refreshDMList();
+      }
     } catch (e) {
-      console.error("Load messages error:", e);
+      console.error("syncMessages error:", e);
     }
   }
 
@@ -329,16 +387,19 @@
       el.remove();
     });
 
-    function getTick(status) {
-      return status === "seen" ? "✓✓" : "✓";
-    }
-
     (msgStore[roomId] || []).forEach(function (msg) {
       var row = document.createElement("div");
       row.className = "msg-row";
       row.style.cssText =
         "display:flex;" +
         (msg.isMe ? "justify-content:flex-end;" : "justify-content:flex-start;");
+
+      var statusText = "";
+      if (msg.isMe) {
+        if (msg.failed) statusText = " !";
+        else if (msg.pending) statusText = " ...";
+        else statusText = " " + tickFor(msg.status);
+      }
 
       row.innerHTML =
         '<div style="' +
@@ -352,6 +413,7 @@
           ? "linear-gradient(135deg,#0065cc,#0045aa)"
           : "rgba(255,255,255,0.07)") +
         ";" +
+        "opacity:" + (msg.failed ? "0.65" : "1") + ";" +
         "border:1px solid " +
         (msg.isMe
           ? "rgba(0,120,255,0.25)"
@@ -359,15 +421,11 @@
         ";" +
         "color:#fff;font-size:14px;line-height:1.45;word-break:break-word;" +
         '">' +
-        "<div>" +
-        esc(msg.text) +
-        "</div>" +
+        "<div>" + esc(msg.text) + "</div>" +
         '<div style="font-size:10px;color:rgba(255,255,255,0.38);margin-top:3px;text-align:right;display:flex;align-items:center;justify-content:flex-end;gap:3px;">' +
-        msg.time +
+        esc(msg.time || "") +
         (msg.isMe
-          ? '<span style="color:rgba(100,180,255,0.7);">' +
-            getTick(msg.status) +
-            "</span>"
+          ? '<span style="color:rgba(100,180,255,0.7);">' + esc(statusText) + "</span>"
           : "") +
         "</div>" +
         "</div>";
@@ -379,11 +437,33 @@
   }
 
   async function _send(roomId, userObj) {
+    if (isSending) return;
+
     var input = qid("chatInput");
     var text = (input ? input.value : "").trim();
     if (!text) return;
 
     var sess = getSession();
+    var tempId = "tmp_" + Date.now();
+
+    isSending = true;
+
+    if (!msgStore[roomId]) msgStore[roomId] = [];
+
+    msgStore[roomId].push({
+      tempId: tempId,
+      id: null,
+      text: text,
+      isMe: true,
+      time: nowTime(),
+      status: "sent",
+      createdAt: new Date().toISOString(),
+      pending: true,
+      failed: false
+    });
+
+    if (input) input.value = "";
+    _renderMsgs(roomId);
 
     try {
       var res = await fetch(window.ENV.API_URL + "/chats/" + roomId + "/messages", {
@@ -398,54 +478,54 @@
       var data = await res.json();
 
       if (!res.ok) {
-        console.error("Send message failed:", data);
-        return;
+        throw new Error(data.message || "Send failed");
       }
 
       var m = data.message;
 
-      if (!msgStore[roomId]) msgStore[roomId] = [];
-
-      msgStore[roomId].push({
-        id: m._id,
-        text: m.content,
-        isMe: true,
-        time: new Date(m.createdAt).toLocaleTimeString([], {
-          hour: "2-digit",
-          minute: "2-digit"
-        }),
-        status: m.status || "sent",
-        createdAt: m.createdAt
+      msgStore[roomId] = (msgStore[roomId] || []).map(function (msg) {
+        if (msg.tempId === tempId) {
+          return {
+            id: m._id,
+            text: m.content,
+            isMe: true,
+            time: formatTime(m.createdAt),
+            status: m.status || "sent",
+            createdAt: m.createdAt,
+            pending: false,
+            failed: false
+          };
+        }
+        return msg;
       });
 
       var preview = qs('[data-userid="' + userObj.userId + '"] .conv-preview');
       if (preview) preview.textContent = text;
 
       var timeEl = qs('[data-userid="' + userObj.userId + '"] .conv-time');
-      if (timeEl) {
-        timeEl.textContent = new Date(m.createdAt).toLocaleTimeString([], {
-          hour: "2-digit",
-          minute: "2-digit"
-        });
-      }
+      if (timeEl) timeEl.textContent = formatTime(m.createdAt);
 
       var dmList = qid("dmContent");
       var item = qs('[data-userid="' + userObj.userId + '"]');
       if (dmList && item) dmList.insertBefore(item, dmList.firstChild);
 
-      if (input) input.value = "";
-
-      var btn = qid("chatSendBtn");
-      if (btn) {
-        btn.style.transform = "scale(0.88)";
-        setTimeout(function () {
-          btn.style.transform = "";
-        }, 120);
-      }
-
       _renderMsgs(roomId);
+      await syncMessages(roomId, true);
+      await refreshDMList();
     } catch (err) {
       console.error("Send message error:", err);
+
+      msgStore[roomId] = (msgStore[roomId] || []).map(function (msg) {
+        if (msg.tempId === tempId) {
+          msg.pending = false;
+          msg.failed = true;
+        }
+        return msg;
+      });
+
+      _renderMsgs(roomId);
+    } finally {
+      isSending = false;
     }
   }
 
@@ -497,54 +577,7 @@
     renderProfile(sess);
     await refreshDMList();
 
-    try {
-      if (window.VibeSocket && typeof window.VibeSocket.connect === "function") {
-        window.VibeSocket.connect(sess.token, async function (msg) {
-          if (!msg) return;
-
-          if (msg.type === "message" && msg.room) {
-            if (!msgStore[msg.room]) msgStore[msg.room] = [];
-
-            msgStore[msg.room].push({
-              id: msg._id || Date.now(),
-              text: msg.text || msg.content,
-              isMe: false,
-              time: nowTime(),
-              status: msg.status || "sent"
-            });
-
-            if (currentRoomId === msg.room) {
-              _renderMsgs(msg.room);
-              await markSeen(msg.room);
-            }
-
-            await refreshDMList();
-          }
-
-          if (msg.type === "seen" && msg.room) {
-            if (msgStore[msg.room]) {
-              msgStore[msg.room] = msgStore[msg.room].map(function (m) {
-                if (m.isMe) m.status = "seen";
-                return m;
-              });
-            }
-
-            if (currentRoomId === msg.room) _renderMsgs(msg.room);
-            await refreshDMList();
-          }
-
-          if (msg.type === "presence" && msg.roomId && chatMeta[msg.roomId]) {
-            chatMeta[msg.roomId].isOnline = !!msg.isOnline;
-            chatMeta[msg.roomId].lastSeenAt = msg.lastSeenAt || null;
-            if (currentRoomId === msg.roomId) {
-              renderUserStatus(chatMeta[msg.roomId]);
-            }
-            await refreshDMList();
-          }
-        });
-      }
-    } catch (e) {
-      console.error("[Socket]", e);
-    }
+    // socket temporarily ignore for stable messaging
+    // polling already handles live-ish updates
   });
 })();
