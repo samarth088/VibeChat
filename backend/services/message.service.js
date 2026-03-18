@@ -9,7 +9,11 @@ const getOrCreateChat = async (user1, user2) => {
 
   if (!chat) {
     chat = await Chat.create({
-      members: [user1, user2]
+      members: [user1, user2],
+      unreadCounts: new Map([
+        [user1.toString(), 0],
+        [user2.toString(), 0]
+      ])
     });
   }
 
@@ -17,15 +21,24 @@ const getOrCreateChat = async (user1, user2) => {
 };
 
 // Save message
-const createMessage = async ({ chatId, sender, text }) => {
+const createMessage = async ({ chatId, sender, receiver, text }) => {
+  if (!chatId || !sender || !receiver || !text || !String(text).trim()) {
+    throw new Error("chatId, sender, receiver and text are required");
+  }
+
+  const cleanText = String(text).trim();
+
   const message = await Message.create({
     chat: chatId,
     sender,
-    text
+    receiver,
+    content: cleanText,
+    status: "sent"
   });
 
   await Chat.findByIdAndUpdate(chatId, {
-    lastMessage: message._id
+    lastMessage: message._id,
+    updatedAt: new Date()
   });
 
   return message;
@@ -34,6 +47,8 @@ const createMessage = async ({ chatId, sender, text }) => {
 // Get chat messages
 const getChatMessages = async (chatId) => {
   return await Message.find({ chat: chatId })
+    .populate("sender", "_id username name avatar")
+    .populate("receiver", "_id username name avatar")
     .sort({ createdAt: 1 });
 };
 
