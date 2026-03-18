@@ -34,11 +34,6 @@
     });
   }
 
-  function tickFor(status) {
-    if (status === "seen") return "✓✓";
-    return "✓";
-  }
-
   var msgStore = {};
   var chatMeta = {};
   var currentRoomId = null;
@@ -69,9 +64,7 @@
 
     try {
       var res = await fetch(window.ENV.API_URL + "/chats", {
-        headers: {
-          Authorization: "Bearer " + sess.token
-        }
+        headers: { Authorization: "Bearer " + sess.token }
       });
 
       var data = await res.json();
@@ -90,6 +83,13 @@
 
     var otherUser = raw.otherUser || raw.user || raw.participant || null;
 
+    if (!otherUser && Array.isArray(raw.members)) {
+      otherUser = raw.members.find(function (p) {
+        var pid = String(p._id || p.id || p.userId || "");
+        return pid !== me;
+      });
+    }
+
     if (!otherUser && Array.isArray(raw.participants)) {
       otherUser = raw.participants.find(function (p) {
         var pid = String(p._id || p.id || p.userId || "");
@@ -101,6 +101,20 @@
     var userId = otherUser ? (otherUser._id || otherUser.id || otherUser.userId) : null;
     var username = otherUser ? (otherUser.username || otherUser.name || "User") : "User";
 
+    // ✅ FIX: lastMessage properly extract karo (populated object ya ObjectId dono handle)
+    var lastMsg = raw.lastMessage;
+    var preview = "Tap to chat";
+    var time = raw.updatedAt || raw.createdAt || null;
+
+    if (lastMsg && typeof lastMsg === "object") {
+      preview = lastMsg.content || lastMsg.text || "Tap to chat";
+      time = lastMsg.createdAt || lastMsg.updatedAt || time;
+    }
+    // Agar lastMessage sirf ObjectId hai (populate nahi hua) to raw.preview use karo
+    if (preview === "Tap to chat" && raw.preview) {
+      preview = raw.preview;
+    }
+
     return {
       roomId: String(chatId),
       userId: String(userId || ""),
@@ -108,15 +122,8 @@
       isOnline: !!(otherUser && otherUser.isOnline),
       lastSeenAt: otherUser ? otherUser.lastSeenAt : null,
       unreadCount: raw.unreadCount || 0,
-      preview:
-        (raw.lastMessage && (raw.lastMessage.content || raw.lastMessage.text)) ||
-        raw.preview ||
-        "Tap to chat",
-      time:
-        (raw.lastMessage && (raw.lastMessage.createdAt || raw.lastMessage.updatedAt)) ||
-        raw.updatedAt ||
-        raw.createdAt ||
-        null
+      preview: preview,
+      time: time
     };
   }
 
@@ -153,7 +160,7 @@
         "</div>" +
         '<div class="conv-meta">' +
           '<div style="display:flex;align-items:center;gap:5px">' +
-            '<span class="conv-time">' + esc(chat.time ? formatTime(chat.time) : "Now") + "</span>" +
+            '<span class="conv-time">' + esc(chat.time ? formatTime(chat.time) : "") + "</span>" +
             (chat.isOnline ? '<div class="online-dot"></div>' : "") +
           "</div>" +
           (chat.unreadCount > 0
@@ -181,6 +188,22 @@
     var chats = await fetchChats();
     var normalized = chats.map(normalizeChat);
     renderDMList(normalized);
+  }
+
+  // ✅ DM list me ek item ka preview locally update karo (bina full refresh ke)
+  function updateDMPreview(roomId, text, time) {
+    var item = qs('[data-room="' + roomId + '"]');
+    if (!item) return;
+
+    var preview = item.querySelector(".conv-preview");
+    if (preview) preview.textContent = text;
+
+    var timeEl = item.querySelector(".conv-time");
+    if (timeEl) timeEl.textContent = time ? formatTime(time) : nowTime();
+
+    // Item ko top pe lao
+    var dmList = qid("dmContent");
+    if (dmList && item) dmList.insertBefore(item, dmList.firstChild);
   }
 
   async function markSeen(roomId) {
@@ -249,56 +272,60 @@
           '<input id="chatInput" type="text" placeholder="Message..." style="flex:1;background:transparent;border:none;outline:none;color:#fff;font-size:14px;padding:11px 0;" />' +
         "</div>" +
         '<button id="chatSendBtn" style="width:44px;height:44px;border-radius:50%;border:none;flex-shrink:0;background:linear-gradient(135deg,#0080ff,#0050cc);cursor:pointer;display:flex;align-items:center;justify-content:center;">' +
-          '<svg viewBox="0 0 24 24" width="20" height="20" fill="white"><path d="M2 21l21-9L2 3v7l15 2-15 2v7z"/></svg>' +
+          '<svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M22 2L11 13" stroke="white" stroke-width="2" stroke-linecap="round"/><path d="M22 2L15 22L11 13L2 9L22 2Z" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>' +
         "</button>" +
       "</div>";
 
     phone.appendChild(page);
 
     renderUserStatus(userObj);
-    loadMessages(roomId);
 
-    qid("chatBackBtn").addEventListener("click", function () {
-      page.remove();
-    });
-
-    qid("chatSendBtn").addEventListener("click", function () {
-      _send(roomId, userObj);
-    });
-
-    qid("chatInput").addEventListener("keydown", function (e) {
-      if (e.key === "Enter") _send(roomId, userObj);
-    });
-
-    if (window.VibeSocket && window.VibeSocket.joinRoom) {
-      window.VibeSocket.joinRoom(roomId);
+    var backBtn = qid("chatBackBtn");
+    if (backBtn) {
+      backBtn.addEventListener("click", function () {
+        page.remove();
+        currentRoomId = null;
+      });
     }
+
+    var sendBtn = qid("chatSendBtn");
+    var input = qid("chatInput");
+
+    if (sendBtn) {
+      sendBtn.addEventListener("click", function () {
+        _send(roomId, userObj);
+      });
+    }
+
+    if (input) {
+      input.addEventListener("keydown", function (e) {
+        if (e.key === "Enter" && !e.shiftKey) {
+          e.preventDefault();
+          _send(roomId, userObj);
+        }
+      });
+    }
+
+    _loadMessages(roomId);
   }
 
-  async function loadMessages(roomId) {
-    try {
-      var sess = getSession();
+  async function _loadMessages(roomId) {
+    var sess = getSession();
+    if (!sess || !sess.token) return;
 
+    try {
       var res = await fetch(window.ENV.API_URL + "/chats/" + roomId + "/messages", {
-        headers: {
-          Authorization: "Bearer " + (sess && sess.token)
-        }
+        headers: { Authorization: "Bearer " + sess.token }
       });
 
       var data = await res.json();
-
-      if (!res.ok) {
-        console.error("Messages fetch failed:", data);
-        return;
-      }
+      if (!res.ok) throw new Error(data.message || "Failed to load messages");
 
       var myId = String(sess.userId);
-
-      msgStore[roomId] = (data.messages || []).map(function (m) {
-        var senderId =
-          typeof m.sender === "object"
-            ? String(m.sender._id || m.sender.id || "")
-            : String(m.sender || "");
+      var msgs = (data.messages || data.data || []).map(function (m) {
+        var senderId = m.sender
+          ? (typeof m.sender === "object" ? String(m.sender._id || m.sender.id) : String(m.sender))
+          : "";
 
         return {
           id: m._id,
@@ -313,6 +340,7 @@
         };
       });
 
+      msgStore[roomId] = msgs;
       _renderMsgs(roomId);
       await markSeen(roomId);
       await refreshDMList();
@@ -345,29 +373,18 @@
         "max-width:75%;min-width:60px;" +
         "padding:8px 12px 6px;" +
         "border-radius:" +
-        (msg.isMe ? "16px 16px 3px 16px" : "16px 16px 16px 3px") +
-        ";" +
+        (msg.isMe ? "16px 16px 3px 16px" : "16px 16px 16px 3px") + ";" +
         "background:" +
-        (msg.isMe
-          ? "linear-gradient(135deg,#0065cc,#0045aa)"
-          : "rgba(255,255,255,0.07)") +
-        ";" +
+        (msg.isMe ? "linear-gradient(135deg,#0065cc,#0045aa)" : "rgba(255,255,255,0.07)") + ";" +
         "border:1px solid " +
-        (msg.isMe
-          ? "rgba(0,120,255,0.25)"
-          : "rgba(255,255,255,0.07)") +
-        ";" +
+        (msg.isMe ? "rgba(0,120,255,0.25)" : "rgba(255,255,255,0.07)") + ";" +
         "color:#fff;font-size:14px;line-height:1.45;word-break:break-word;" +
         '">' +
-        "<div>" +
-        esc(msg.text) +
-        "</div>" +
+        "<div>" + esc(msg.text) + "</div>" +
         '<div style="font-size:10px;color:rgba(255,255,255,0.38);margin-top:3px;text-align:right;display:flex;align-items:center;justify-content:flex-end;gap:3px;">' +
         msg.time +
         (msg.isMe
-          ? '<span style="color:rgba(100,180,255,0.7);">' +
-            getTick(msg.status) +
-            "</span>"
+          ? '<span style="color:rgba(100,180,255,0.7);">' + getTick(msg.status) + "</span>"
           : "") +
         "</div>" +
         "</div>";
@@ -384,68 +401,94 @@
     if (!text) return;
 
     var sess = getSession();
+    if (!sess) return;
 
-    try {
-      var res = await fetch(window.ENV.API_URL + "/chats/" + roomId + "/messages", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: "Bearer " + (sess && sess.token)
-        },
-        body: JSON.stringify({ content: text })
-      });
+    // ✅ Optimistic UI — pehle screen pe dikhao, phir send karo (fast feel)
+    var tempMsg = {
+      id: "temp-" + Date.now(),
+      text: text,
+      isMe: true,
+      time: nowTime(),
+      status: "sent",
+      createdAt: new Date().toISOString()
+    };
 
-      var data = await res.json();
+    if (!msgStore[roomId]) msgStore[roomId] = [];
+    msgStore[roomId].push(tempMsg);
+    _renderMsgs(roomId);
+    updateDMPreview(roomId, text, tempMsg.createdAt);
+    if (input) input.value = "";
 
-      if (!res.ok) {
-        console.error("Send message failed:", data);
-        return;
-      }
+    // Send button animation
+    var btn = qid("chatSendBtn");
+    if (btn) {
+      btn.style.transform = "scale(0.88)";
+      setTimeout(function () { btn.style.transform = ""; }, 120);
+    }
 
-      var m = data.message;
+    // ✅ Socket se bhejo (fast) — REST API fallback
+    var socketSent = false;
 
-      if (!msgStore[roomId]) msgStore[roomId] = [];
-
-      msgStore[roomId].push({
-        id: m._id,
-        text: m.content,
-        isMe: true,
-        time: new Date(m.createdAt).toLocaleTimeString([], {
-          hour: "2-digit",
-          minute: "2-digit"
-        }),
-        status: m.status || "sent",
-        createdAt: m.createdAt
-      });
-
-      var preview = qs('[data-userid="' + userObj.userId + '"] .conv-preview');
-      if (preview) preview.textContent = text;
-
-      var timeEl = qs('[data-userid="' + userObj.userId + '"] .conv-time');
-      if (timeEl) {
-        timeEl.textContent = new Date(m.createdAt).toLocaleTimeString([], {
-          hour: "2-digit",
-          minute: "2-digit"
+    if (window.VibeSocket && typeof window.VibeSocket.emit === "function") {
+      try {
+        socketSent = window.VibeSocket.emit("private-message", {
+          from: sess.userId,
+          to: userObj.userId,
+          text: text
         });
+      } catch (e) {
+        console.warn("Socket send failed, falling back to REST:", e);
       }
+    }
 
-      var dmList = qid("dmContent");
-      var item = qs('[data-userid="' + userObj.userId + '"]');
-      if (dmList && item) dmList.insertBefore(item, dmList.firstChild);
+    // REST API fallback (agar socket connected nahi hai)
+    if (!socketSent) {
+      try {
+        var res = await fetch(window.ENV.API_URL + "/chats/" + roomId + "/messages", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: "Bearer " + sess.token
+          },
+          body: JSON.stringify({ content: text })
+        });
 
-      if (input) input.value = "";
+        var data = await res.json();
 
-      var btn = qid("chatSendBtn");
-      if (btn) {
-        btn.style.transform = "scale(0.88)";
-        setTimeout(function () {
-          btn.style.transform = "";
-        }, 120);
+        if (!res.ok) {
+          console.error("Send message failed:", data);
+          // Temp message ko remove karo error pe
+          msgStore[roomId] = msgStore[roomId].filter(function (m) {
+            return m.id !== tempMsg.id;
+          });
+          _renderMsgs(roomId);
+          return;
+        }
+
+        // Temp ko real message se replace karo
+        var m = data.message;
+        msgStore[roomId] = msgStore[roomId].map(function (msg) {
+          if (msg.id === tempMsg.id) {
+            return {
+              id: m._id,
+              text: m.content,
+              isMe: true,
+              time: new Date(m.createdAt).toLocaleTimeString([], {
+                hour: "2-digit",
+                minute: "2-digit"
+              }),
+              status: m.status || "sent",
+              createdAt: m.createdAt
+            };
+          }
+          return msg;
+        });
+
+        updateDMPreview(roomId, text, m.createdAt);
+        _renderMsgs(roomId);
+      } catch (err) {
+        console.error("Send message REST error:", err);
       }
-
-      _renderMsgs(roomId);
-    } catch (err) {
-      console.error("Send message error:", err);
     }
   }
 
@@ -502,44 +545,76 @@
         window.VibeSocket.connect(sess.token, async function (msg) {
           if (!msg) return;
 
-          if (msg.type === "message" && msg.room) {
-            if (!msgStore[msg.room]) msgStore[msg.room] = [];
+          // ✅ Incoming message (doosre ne bheja)
+          if (msg.type === "private-message") {
+            var chatId = String(msg.chat || "");
+            if (!msgStore[chatId]) msgStore[chatId] = [];
 
-            msgStore[msg.room].push({
-              id: msg._id || Date.now(),
-              text: msg.text || msg.content,
-              isMe: false,
-              time: nowTime(),
-              status: msg.status || "sent"
+            // Duplicate check
+            var alreadyExists = msgStore[chatId].some(function (m) {
+              return m.createdAt === msg.createdAt && !m.isMe;
             });
 
-            if (currentRoomId === msg.room) {
-              _renderMsgs(msg.room);
-              await markSeen(msg.room);
-            }
+            if (!alreadyExists) {
+              msgStore[chatId].push({
+                id: msg._id || Date.now(),
+                text: msg.content || msg.text,
+                isMe: false,
+                time: msg.createdAt ? formatTime(msg.createdAt) : nowTime(),
+                status: "delivered",
+                createdAt: msg.createdAt
+              });
 
-            await refreshDMList();
+              if (currentRoomId === chatId) {
+                _renderMsgs(chatId);
+                await markSeen(chatId);
+              }
+
+              updateDMPreview(chatId, msg.content || msg.text, msg.createdAt);
+            }
           }
 
-          if (msg.type === "seen" && msg.room) {
-            if (msgStore[msg.room]) {
-              msgStore[msg.room] = msgStore[msg.room].map(function (m) {
-                if (m.isMe) m.status = "seen";
+          // ✅ Apna message confirm hua socket se
+          if (msg.type === "message-sent") {
+            var chatId = String(msg.chat || "");
+            if (msgStore[chatId]) {
+              // Last temp message replace karo
+              var tempIdx = -1;
+              for (var i = msgStore[chatId].length - 1; i >= 0; i--) {
+                if (String(msgStore[chatId][i].id).startsWith("temp-") && msgStore[chatId][i].isMe) {
+                  tempIdx = i;
+                  break;
+                }
+              }
+              if (tempIdx !== -1) {
+                msgStore[chatId][tempIdx].id = msg._id || msgStore[chatId][tempIdx].id;
+                msgStore[chatId][tempIdx].createdAt = msg.createdAt;
+                msgStore[chatId][tempIdx].time = msg.createdAt ? formatTime(msg.createdAt) : nowTime();
+                if (currentRoomId === chatId) _renderMsgs(chatId);
+              }
+            }
+          }
+
+          // ✅ Seen status update
+          if (msg.type === "seen" && msg.msgId) {
+            Object.keys(msgStore).forEach(function (rid) {
+              msgStore[rid] = msgStore[rid].map(function (m) {
+                if (m.id === msg.msgId && m.isMe) m.status = "seen";
                 return m;
               });
-            }
-
-            if (currentRoomId === msg.room) _renderMsgs(msg.room);
-            await refreshDMList();
+            });
+            if (currentRoomId) _renderMsgs(currentRoomId);
           }
 
-          if (msg.type === "presence" && msg.roomId && chatMeta[msg.roomId]) {
-            chatMeta[msg.roomId].isOnline = !!msg.isOnline;
-            chatMeta[msg.roomId].lastSeenAt = msg.lastSeenAt || null;
-            if (currentRoomId === msg.roomId) {
-              renderUserStatus(chatMeta[msg.roomId]);
-            }
-            await refreshDMList();
+          // ✅ Presence
+          if (msg.type === "user-online" || msg.type === "user-offline") {
+            Object.keys(chatMeta).forEach(function (rid) {
+              if (chatMeta[rid].userId === String(msg.userId)) {
+                chatMeta[rid].isOnline = msg.type === "user-online";
+                chatMeta[rid].lastSeenAt = msg.lastSeen || null;
+                if (currentRoomId === rid) renderUserStatus(chatMeta[rid]);
+              }
+            });
           }
         });
       }
