@@ -27,6 +27,11 @@ const messageSchema = new mongoose.Schema(
       enum: ["sent", "delivered", "seen"],
       default: "sent"
     },
+    // ✅ FIX: deliveredAt field add kiya — chat.socket.js use karta tha but schema mein tha nahi
+    deliveredAt: {
+      type: Date,
+      default: null
+    },
     seenAt: {
       type: Date,
       default: null
