@@ -1,3 +1,4 @@
+// UPDATED
 const express = require("express");
 const router = express.Router();
 
@@ -19,7 +20,7 @@ router.get("/search", searchUser);
 // Get my profile
 router.get("/me", getProfile);
 
-// Update my profile
+// Update my profile (name, username, bio, avatar)
 router.put("/me", updateProfile);
 
 // Get all users (except me)
