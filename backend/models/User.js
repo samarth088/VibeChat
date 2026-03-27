@@ -1,4 +1,4 @@
-// models/User.js
+// UPDATED
 const mongoose = require('mongoose');
 const crypto = require('crypto');
 
@@ -18,10 +18,11 @@ const userSchema = new mongoose.Schema({
     required: true,
     trim: true,
   },
-  // ✅ FIX 1: username field add ki — model mein thi hi nahi
+  // ✅ ADDED: username field
   username: {
     type: String,
     unique: true,
+    sparse: true,
     lowercase: true,
     trim: true,
     index: true,
@@ -38,10 +39,12 @@ const userSchema = new mongoose.Schema({
     required: true,
     minlength: 6,
   },
+  // ✅ ADDED: avatar (url or base64)
   avatar: {
     type: String,
     default: '',
   },
+  // ✅ ADDED: bio
   bio: {
     type: String,
     default: '',
@@ -55,7 +58,7 @@ const userSchema = new mongoose.Schema({
     enum: ['online', 'offline', 'away'],
     default: 'offline',
   },
-  // ✅ FIX 2: isOnline + socketId add ki — chat.socket.js use kar raha tha, model mein nahi thi
+  // ✅ ADDED: isOnline + socketId + lastSeen
   isOnline: {
     type: Boolean,
     default: false,
@@ -66,7 +69,7 @@ const userSchema = new mongoose.Schema({
   },
   lastSeen: {
     type: Date,
-    default: Date.now,
+    default: null,
   },
 }, { timestamps: true });
 
