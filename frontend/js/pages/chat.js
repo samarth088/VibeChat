@@ -1,5 +1,4 @@
-// js/pages/chat.js
-
+// UPDATED
 (function () {
   function qid(id) { return document.getElementById(id); }
   function qs(sel) { return document.querySelector(sel); }
@@ -40,6 +39,20 @@
     });
   }
 
+  // ADDED: nicer "last seen X minutes ago" formatter
+  function timeAgoText(date) {
+    if (!date) return "offline";
+    var d = new Date(date);
+    if (isNaN(d.getTime())) return "offline";
+
+    var diff = Math.floor((Date.now() - d.getTime()) / 1000); // seconds
+    if (diff < 60) return "Last seen just now";
+    if (diff < 3600) return "Last seen " + Math.floor(diff / 60) + " minutes ago";
+    if (diff < 86400) return "Last seen " + Math.floor(diff / 3600) + " hours ago";
+
+    return "Last seen " + d.toLocaleString([], { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" });
+  }
+
   var msgStore = {};
   var chatMeta = {};
   var currentRoomId = null;
@@ -69,7 +82,13 @@
     });
 
     var av = qs(".profile-avatar-big");
-    if (av) av.textContent = (sess.username || "Y").charAt(0).toUpperCase();
+    if (av) {
+      if (sess.avatar) {
+        av.innerHTML = '<img src="' + esc(sess.avatar) + '" alt="avatar" style="width:100%;height:100%;border-radius:50%;object-fit:cover;">';
+      } else {
+        av.textContent = (sess.username || "Y").charAt(0).toUpperCase();
+      }
+    }
   }
 
   async function fetchChats() {
@@ -136,6 +155,8 @@
       lastSeenAt: otherUser
         ? (otherUser.lastSeen || otherUser.lastSeenAt || null)
         : null,
+      avatar: otherUser ? (otherUser.avatar || "") : "",
+      bio: otherUser ? (otherUser.bio || "") : "",
       unreadCount: myUnread,
       preview:
         (raw.lastMessage && (raw.lastMessage.content || raw.lastMessage.text)) ||
@@ -162,6 +183,13 @@
       return;
     }
 
+    // ADDED: sort chats by time (latest first). Null times go to the end.
+    chats.sort(function (a, b) {
+      var ta = a.time ? new Date(a.time).getTime() : 0;
+      var tb = b.time ? new Date(b.time).getTime() : 0;
+      return tb - ta;
+    });
+
     chats.forEach(function (chat) {
       chatMeta[chat.roomId] = chat;
 
@@ -170,11 +198,17 @@
       item.setAttribute("data-userid", chat.userId);
       item.setAttribute("data-room", chat.roomId);
 
+      // Avatar: image when available, else initial
+      var avatarHtml = '';
+      if (chat.avatar) {
+        avatarHtml = '<div class="avatar"><img src="' + esc(chat.avatar) + '" alt="avatar" style="width:100%;height:100%;border-radius:50%;object-fit:cover;"></div>';
+      } else {
+        avatarHtml = '<div class="avatar">' + esc((chat.username || "U").charAt(0).toUpperCase()) + '</div>';
+      }
+
       item.innerHTML =
         '<div class="avatar-wrap">' +
-          '<div class="avatar">' +
-            esc((chat.username || "U").charAt(0).toUpperCase()) +
-          "</div>" +
+          avatarHtml +
           (chat.unreadCount > 0
             ? '<div class="unread-badge">' + chat.unreadCount + "</div>"
             : "") +
@@ -203,7 +237,8 @@
             userId: chat.userId,
             username: chat.username,
             isOnline: chat.isOnline,
-            lastSeenAt: chat.lastSeenAt
+            lastSeenAt: chat.lastSeenAt,
+            avatar: chat.avatar
           },
           chat.roomId
         );
@@ -216,6 +251,14 @@
   async function refreshDMList() {
     var chats = await fetchChats();
     var normalized = chats.map(normalizeChat);
+
+    // ADDED: ensure stable sort here as well (safety)
+    normalized.sort(function (a, b) {
+      var ta = a.time ? new Date(a.time).getTime() : 0;
+      var tb = b.time ? new Date(b.time).getTime() : 0;
+      return tb - ta;
+    });
+
     renderDMList(normalized);
   }
 
@@ -241,9 +284,11 @@
     if (!statusEl) return;
 
     if (userObj && userObj.isOnline) {
-      statusEl.textContent = "online";
+      statusEl.textContent = "Online";
+      statusEl.style.color = "#2ee67e";
     } else {
-      statusEl.textContent = formatLastSeen(userObj && userObj.lastSeenAt);
+      statusEl.textContent = timeAgoText(userObj && userObj.lastSeenAt);
+      statusEl.style.color = "rgba(255,255,255,0.6)";
     }
   }
 
@@ -253,12 +298,22 @@
     chatMeta[roomId] = chatMeta[roomId] || {};
     chatMeta[roomId].preview = text || "";
     chatMeta[roomId].time = createdAt || new Date().toISOString();
+    if (userObj && typeof userObj.isOnline !== "undefined") {
+      chatMeta[roomId].isOnline = !!userObj.isOnline;
+    }
+    if (userObj && userObj.lastSeenAt) {
+      chatMeta[roomId].lastSeenAt = userObj.lastSeenAt;
+    }
 
     var item =
       qs('[data-room="' + roomId + '"]') ||
       qs('[data-userid="' + (userObj && userObj.userId ? userObj.userId : "") + '"]');
 
-    if (!item) return;
+    // If item exists update its preview and time & move to top
+    if (!item) {
+      // nothing to move, will be handled on next refresh
+      return;
+    }
 
     var previewEl = item.querySelector(".conv-preview");
     var timeEl = item.querySelector(".conv-time");
@@ -270,6 +325,7 @@
       timeEl.textContent = formatTime(createdAt || new Date().toISOString());
     }
 
+    // Move item to top so user sees latest message instantly
     if (dmList) {
       dmList.insertBefore(item, dmList.firstChild);
     }
@@ -328,6 +384,13 @@
     var initial = esc((userObj.username || "U").charAt(0).toUpperCase());
     var username = esc(userObj.username || "User");
 
+    var avatarHtml = '';
+    if (userObj.avatar) {
+      avatarHtml = '<div style="width:42px;height:42px;border-radius:50%;overflow:hidden;border:2px solid rgba(0,100,220,0.4);flex-shrink:0;"><img src="' + esc(userObj.avatar) + '" alt="avatar" style="width:100%;height:100%;object-fit:cover;"></div>';
+    } else {
+      avatarHtml = '<div style="width:42px;height:42px;border-radius:50%;background:linear-gradient(135deg,#1a3a6a,#0d1f3c);border:2px solid rgba(0,100,220,0.4);display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:700;color:#4db8ff;flex-shrink:0;">' + initial + '</div>';
+    }
+
     var page = document.createElement("div");
     page.id = "chatPage";
     page.style.cssText =
@@ -336,9 +399,7 @@
     page.innerHTML =
       '<div id="chatPageHeader" style="display:flex;align-items:center;gap:12px;padding:12px 14px;background:rgba(0,8,28,0.95);border-bottom:1px solid rgba(0,100,255,0.2);flex-shrink:0;">' +
         '<button id="chatBackBtn" style="background:none;border:none;color:#4db8ff;font-size:26px;line-height:1;cursor:pointer;padding:0 6px 0 0;">‹</button>' +
-        '<div style="width:42px;height:42px;border-radius:50%;background:linear-gradient(135deg,#1a3a6a,#0d1f3c);border:2px solid rgba(0,100,220,0.4);display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:700;color:#4db8ff;flex-shrink:0;">' +
-          initial +
-        "</div>" +
+          avatarHtml +
         '<div style="flex:1;min-width:0;">' +
           '<div style="color:#fff;font-size:15px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' +
             username +
@@ -610,6 +671,7 @@
         window.VibeSocket.connect(sess.token, async function (msg) {
           if (!msg) return;
 
+          // MESSAGE
           if (msg.type === "message" && msg.room) {
             if (!msgStore[msg.room]) msgStore[msg.room] = [];
 
@@ -638,9 +700,13 @@
               await markSeen(msg.room);
             }
 
+            // Move chat to top instantly via preview upsert
+            upsertDMPreview(msg.room, { userId: (chatMeta[msg.room] && chatMeta[msg.room].userId) }, chatMeta[msg.room] ? chatMeta[msg.room].preview : (msg.text || msg.content || ""), msg.createdAt || new Date().toISOString());
+
             await refreshDMList();
           }
 
+          // SEEN
           if (msg.type === "seen" && msg.room) {
             if (msgStore[msg.room]) {
               msgStore[msg.room] = msgStore[msg.room].map(function (m) {
@@ -658,12 +724,19 @@
             await refreshDMList();
           }
 
-          if (msg.type === "presence" && msg.roomId && chatMeta[msg.roomId]) {
-            chatMeta[msg.roomId].isOnline = !!msg.isOnline;
-            chatMeta[msg.roomId].lastSeenAt = msg.lastSeenAt || null;
+          // PRESENCE
+          if (msg.type === "presence" && msg.userId) {
+            // Update any chatMeta entries for this userId
+            Object.keys(chatMeta).forEach(function (r) {
+              if (chatMeta[r].userId === String(msg.userId)) {
+                chatMeta[r].isOnline = !!msg.isOnline;
+                chatMeta[r].lastSeenAt = msg.lastSeen || null;
+              }
+            });
 
-            if (currentRoomId === msg.roomId) {
-              renderUserStatus(chatMeta[msg.roomId]);
+            // If currently open chat belongs to that user, update header
+            if (currentRoomId && chatMeta[currentRoomId] && chatMeta[currentRoomId].userId === String(msg.userId)) {
+              renderUserStatus(chatMeta[currentRoomId]);
             }
 
             await refreshDMList();
