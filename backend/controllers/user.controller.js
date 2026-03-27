@@ -1,3 +1,4 @@
+// UPDATED
 const User = require("../models/User");
 
 
@@ -7,8 +8,8 @@ exports.getAllUsers = async (req,res,next)=>{
 
     const users = await User.find(
       {_id:{ $ne:req.user._id }},
-      "username name bio avatar uid status"
-    );
+      "username name bio avatar uid status isOnline lastSeen"
+    ).sort({ name: 1 });
 
     res.json({
       success:true,
@@ -49,12 +50,39 @@ exports.getProfile = async (req,res,next)=>{
 exports.updateProfile = async (req,res,next)=>{
   try{
 
-    const { bio, avatar } = req.body;
+    const { name, username, bio, avatar } = req.body;
 
+    // Basic validation
+    const updates = {};
+    if (typeof name === "string") updates.name = name.trim();
+    if (typeof bio === "string") updates.bio = bio;
+    if (typeof avatar === "string") updates.avatar = avatar;
+
+    // Username uniqueness check
+    if (typeof username === "string") {
+      const clean = username.trim().toLowerCase();
+      if (!/^[a-z0-9_\.]{3,30}$/.test(clean)) {
+        return res.status(400).json({
+          success:false,
+          message:"Username must be 3-30 characters: letters, numbers, underscore or dot"
+        });
+      }
+
+      const existing = await User.findOne({ username: clean, _id: { $ne: req.user._id } });
+      if (existing) {
+        return res.status(400).json({
+          success:false,
+          message:"Username already taken"
+        });
+      }
+      updates.username = clean;
+    }
+
+    // Perform update
     const user = await User.findByIdAndUpdate(
       req.user._id,
-      { bio, avatar },
-      { new:true }
+      updates,
+      { new:true, runValidators: true }
     ).select("-password");
 
     res.json({
@@ -63,6 +91,14 @@ exports.updateProfile = async (req,res,next)=>{
     });
 
   }catch(err){
+    // Handle duplicate key errors defensively
+    if (err && err.code === 11000) {
+      const key = Object.keys(err.keyValue || {}).join(", ");
+      return res.status(400).json({
+        success:false,
+        message:`Duplicate value for field: ${key}`
+      });
+    }
     next(err);
   }
 };
@@ -89,7 +125,7 @@ exports.searchUser = async (req,res,next)=>{
         { username:query }
       ],
       _id:{ $ne:req.user._id }
-    }).select("_id name username uid avatar status");
+    }).select("_id name username uid avatar status isOnline lastSeen");
 
     if(!user){
       return res.json({
@@ -105,7 +141,9 @@ exports.searchUser = async (req,res,next)=>{
         name:user.name,
         username:user.username,
         avatar:user.avatar,
-        online:user.status==="online"
+        bio: user.bio || '',
+        isOnline: !!user.isOnline,
+        lastSeen: user.lastSeen || null
       }
     });
 
