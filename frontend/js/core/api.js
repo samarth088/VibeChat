@@ -1,4 +1,4 @@
-// js/core/api.js
+// UPDATED
 // Production-ready API wrapper
 // Load order: env.js → state.js → api.js
 
@@ -142,7 +142,8 @@ login: function (data) {
       uid:      res.user.uid,
       username: res.user.username || res.user.name,
       avatar:   res.user.avatar || '',
-      online:   res.user.online || false
+      online:   res.user.isOnline || false,
+      lastSeen: res.user.lastSeen || null
     }];
 
   });
@@ -179,6 +180,50 @@ getUserById: function (userId) {
   });
 
 },
+
+    // ─────────────────────────────────────────
+    // Get my profile
+    // ─────────────────────────────────────────
+    getMyProfile: function(token){
+      if(!token){
+        var sess = window.VibeState && window.VibeState.loadSession ? window.VibeState.loadSession() : null;
+        token = sess && sess.token;
+      }
+
+      return fetchJSON(cfg.API_URL + '/users/me', {
+        headers: {
+          'Authorization': 'Bearer ' + (token || '')
+        }
+      }).then(function(res){
+        if(!res.success) throw new Error(res.message || "Failed to load profile");
+        return res.user;
+      });
+    },
+
+    // ─────────────────────────────────────────
+    // Update my profile (name, username, bio, avatar)
+    // ─────────────────────────────────────────
+    updateProfile: function(data, token){
+      if(!token){
+        var sess = window.VibeState && window.VibeState.loadSession ? window.VibeState.loadSession() : null;
+        token = sess && sess.token;
+      }
+
+      // data: { name, username, bio, avatar }
+      return fetchJSON(cfg.API_URL + '/users/me', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ' + (token || '')
+        },
+        body: JSON.stringify(data)
+      }).then(function(res){
+        if(!res.success) throw new Error(res.message || "Update failed");
+        return res.user;
+      });
+    },
+
+    // ─────────────────────────────────────────
     // OPEN CHAT
 openChatWith: function (userId, token) {
 
