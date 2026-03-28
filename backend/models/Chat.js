@@ -12,10 +12,17 @@ const chatSchema = new mongoose.Schema(
 
     lastMessage: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "Message"
+      ref: "Message",
+      default: null
     },
 
-    // ===== UNREAD SYSTEM =====
+    // ADDED
+    lastMessageAt: {
+      type: Date,
+      default: null,
+      index: true
+    },
+
     unreadCounts: {
       type: Map,
       of: Number,
@@ -25,7 +32,8 @@ const chatSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-// Index for faster member lookup
+// UPDATED
 chatSchema.index({ members: 1 });
+chatSchema.index({ lastMessageAt: -1, updatedAt: -1 });
 
 module.exports = mongoose.model("Chat", chatSchema);
