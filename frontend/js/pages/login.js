@@ -1,27 +1,32 @@
-// js/pages/login.js
-document.addEventListener('DOMContentLoaded', function () {
-  var form      = document.getElementById('loginForm');
-  var errorBox  = document.getElementById('loginError');
+document.addEventListener("DOMContentLoaded", function () {
+  var form = document.getElementById("loginForm");
+  var errorBox = document.getElementById("loginError");
   var submitBtn = form ? form.querySelector('button[type="submit"]') : null;
 
   if (!form) return;
 
-  form.addEventListener('submit', async function (e) {
+  form.addEventListener("submit", async function (e) {
     e.preventDefault();
 
-    errorBox.textContent = '';
-    errorBox.classList.add('hidden');
+    errorBox.textContent = "";
+    errorBox.classList.add("hidden");
 
-    var formData   = new FormData(form);
-    var identifier = (formData.get('identifier') || '').trim();
-    var password   = formData.get('password') || '';
+    var formData = new FormData(form);
+    var identifier = (formData.get("identifier") || "").trim();
+    var password = formData.get("password") || "";
 
     if (!identifier || !password) {
-      showError('Please fill in all fields.');
+      showError("Please fill in all fields.");
       return;
     }
+
     if (password.length < 6) {
-      showError('Password must be at least 6 characters.');
+      showError("Password must be at least 6 characters.");
+      return;
+    }
+
+    if (!window.VibeAPI || typeof window.VibeAPI.login !== "function") {
+      showError("Login service not loaded.");
       return;
     }
 
@@ -30,44 +35,43 @@ document.addEventListener('DOMContentLoaded', function () {
     try {
       var response = await window.VibeAPI.login({
         identifier: identifier,
-        password:   password
+        password: password
       });
 
-      // ── FIX: response.user aata hai backend se ──
-      // auth.controller.js returns: { token, user: { id, uid, username, email, avatar } }
       var userData = response.user || {};
 
       var session = {
-        userId:      userData.id   || response.userId,
-        uid:         userData.uid  || '',          // ← vibe_a3f9k2 format
-        idFormatted: userData.uid  || '',          // display ke liye same uid
-        username:    userData.username || userData.email || identifier,
-        email:       userData.email || identifier,
-        avatar:      userData.avatar || '',
-        token:       response.token || '',
-        profile:     response.profile || {}
+        userId: userData.id || response.userId,
+        uid: userData.uid || "",
+        idFormatted: userData.uid || userData.id || response.userId || "",
+        name: userData.name || "",
+        username: userData.username || userData.email || identifier,
+        email: userData.email || identifier,
+        avatar: userData.avatar || "",
+        bio: userData.bio || "",
+        token: response.token || "",
+        profile: response.profile || {}
       };
 
       window.VibeState.saveSession(session);
 
       setTimeout(function () {
-        window.location.assign('./app.html');
+        window.location.assign("./app.html");
       }, 50);
-
     } catch (err) {
       setLoading(false);
-      showError(err.message || 'Login failed. Please try again.');
+      showError(err.message || "Login failed. Please try again.");
     }
   });
 
   function showError(msg) {
     errorBox.textContent = msg;
-    errorBox.classList.remove('hidden');
+    errorBox.classList.remove("hidden");
   }
 
   function setLoading(on) {
     if (!submitBtn) return;
-    submitBtn.disabled    = on;
-    submitBtn.textContent = on ? 'Signing in…' : 'Sign in';
+    submitBtn.disabled = on;
+    submitBtn.textContent = on ? "Signing in..." : "Sign in";
   }
 });
