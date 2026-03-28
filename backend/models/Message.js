@@ -1,42 +1,39 @@
 const mongoose = require("mongoose");
 
-const messageSchema = new mongoose.Schema(
+const chatSchema = new mongoose.Schema(
   {
-    chat: {
+    members: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "User",
+        required: true
+      }
+    ],
+
+    lastMessage: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "Chat",
-      required: true
-    },
-    sender: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "User",
-      required: true
-    },
-    receiver: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "User",
-      required: true
-    },
-    content: {
-      type: String,
-      required: true,
-      trim: true
-    },
-    status: {
-      type: String,
-      enum: ["sent", "delivered", "seen"],
-      default: "sent"
-    },
-    deliveredAt: {
-      type: Date,
+      ref: "Message",
       default: null
     },
-    seenAt: {
+
+    // ADDED
+    lastMessageAt: {
       type: Date,
-      default: null
+      default: null,
+      index: true
+    },
+
+    unreadCounts: {
+      type: Map,
+      of: Number,
+      default: {}
     }
   },
   { timestamps: true }
 );
 
-module.exports = mongoose.model("Message", messageSchema);
+// UPDATED
+chatSchema.index({ members: 1 });
+chatSchema.index({ lastMessageAt: -1, updatedAt: -1 });
+
+module.exports = mongoose.model("Chat", chatSchema);
