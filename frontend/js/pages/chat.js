@@ -87,7 +87,7 @@
       var idText =
         sess.idFormatted ||
         (window.VibeState && window.VibeState.formatId
-          ? window.VibeState.formatId(sess.userId)
+          ? window.VibeState.formatId(sess.uid || sess.userId)
           : (sess.uid || sess.userId));
 
       el.textContent =
