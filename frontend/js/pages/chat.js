@@ -1,4 +1,3 @@
-// UPDATED
 (function () {
   function qid(id) { return document.getElementById(id); }
   function qs(sel) { return document.querySelector(sel); }
@@ -7,6 +6,14 @@
   function esc(t) {
     return String(t || "")
       .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;");
+  }
+
+  function escAttr(t) {
+    return String(t || "")
+      .replace(/&/g, "&amp;")
+      .replace(/"/g, "&quot;")
       .replace(/</g, "&lt;")
       .replace(/>/g, "&gt;");
   }
@@ -26,36 +33,25 @@
     });
   }
 
-  function formatLastSeen(date) {
-    if (!date) return "offline";
-    var d = new Date(date);
-    if (isNaN(d.getTime())) return "offline";
+  function timeAgoText(date) {
+    if (!date) return "Offline";
 
-    return "last seen " + d.toLocaleString([], {
-      hour: "2-digit",
-      minute: "2-digit",
+    var d = new Date(date);
+    if (isNaN(d.getTime())) return "Offline";
+
+    var diffSec = Math.max(0, Math.floor((Date.now() - d.getTime()) / 1000));
+
+    if (diffSec < 60) return "Last seen just now";
+    if (diffSec < 3600) return "Last seen " + Math.floor(diffSec / 60) + " minute" + (Math.floor(diffSec / 60) > 1 ? "s" : "") + " ago";
+    if (diffSec < 86400) return "Last seen " + Math.floor(diffSec / 3600) + " hour" + (Math.floor(diffSec / 3600) > 1 ? "s" : "") + " ago";
+
+    return "Last seen " + d.toLocaleString([], {
       day: "2-digit",
-      month: "short"
+      month: "short",
+      hour: "2-digit",
+      minute: "2-digit"
     });
   }
-
-  // ADDED: nicer "last seen X minutes ago" formatter
-  function timeAgoText(date) {
-    if (!date) return "offline";
-    var d = new Date(date);
-    if (isNaN(d.getTime())) return "offline";
-
-    var diff = Math.floor((Date.now() - d.getTime()) / 1000); // seconds
-    if (diff < 60) return "Last seen just now";
-    if (diff < 3600) return "Last seen " + Math.floor(diff / 60) + " minutes ago";
-    if (diff < 86400) return "Last seen " + Math.floor(diff / 3600) + " hours ago";
-
-    return "Last seen " + d.toLocaleString([], { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" });
-  }
-
-  var msgStore = {};
-  var chatMeta = {};
-  var currentRoomId = null;
 
   function getSession() {
     return window.VibeState && window.VibeState.loadSession
@@ -63,9 +59,28 @@
       : null;
   }
 
+  function saveSessionSafe(sess) {
+    if (window.VibeState && typeof window.VibeState.saveSession === "function") {
+      window.VibeState.saveSession(sess);
+    }
+  }
+
+  function sortChatsByLatest(list) {
+    return (list || []).sort(function (a, b) {
+      var ta = a && a.time ? new Date(a.time).getTime() : 0;
+      var tb = b && b.time ? new Date(b.time).getTime() : 0;
+      return tb - ta;
+    });
+  }
+
+  var msgStore = {};
+  var chatMeta = {};
+  var currentRoomId = null;
+  var currentChatUser = null;
+
   function renderProfile(sess) {
     qsa(".profile-name").forEach(function (el) {
-      el.textContent = sess.username || "Your Name";
+      el.textContent = sess.name || sess.username || "Your Name";
     });
 
     qsa(".profile-uid").forEach(function (el) {
@@ -73,7 +88,7 @@
         sess.idFormatted ||
         (window.VibeState && window.VibeState.formatId
           ? window.VibeState.formatId(sess.userId)
-          : sess.userId);
+          : (sess.uid || sess.userId));
 
       el.textContent =
         (sess.username ? "@" + sess.username + " · " : "") +
@@ -81,12 +96,16 @@
         idText;
     });
 
+    qsa(".profile-bio").forEach(function (el) {
+      el.textContent = sess.bio || "No bio yet";
+    });
+
     var av = qs(".profile-avatar-big");
     if (av) {
       if (sess.avatar) {
-        av.innerHTML = '<img src="' + esc(sess.avatar) + '" alt="avatar" style="width:100%;height:100%;border-radius:50%;object-fit:cover;">';
+        av.innerHTML = '<img src="' + escAttr(sess.avatar) + '" alt="avatar" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">';
       } else {
-        av.textContent = (sess.username || "Y").charAt(0).toUpperCase();
+        av.textContent = (sess.username || sess.name || "Y").charAt(0).toUpperCase();
       }
     }
   }
@@ -134,6 +153,7 @@
     var userId = otherUser
       ? (otherUser._id || otherUser.id || otherUser.userId)
       : null;
+
     var username = otherUser
       ? (otherUser.username || otherUser.name || "User")
       : "User";
@@ -142,7 +162,11 @@
     var myUnread = 0;
 
     try {
-      myUnread = Number(unreadMap[me] || 0);
+      if (typeof unreadMap.get === "function") {
+        myUnread = Number(unreadMap.get(me) || 0);
+      } else {
+        myUnread = Number(unreadMap[me] || raw.unreadCount || 0);
+      }
     } catch (e) {
       myUnread = Number(raw.unreadCount || 0);
     }
@@ -151,12 +175,11 @@
       roomId: String(chatId || ""),
       userId: String(userId || ""),
       username: username,
-      isOnline: !!(otherUser && otherUser.isOnline),
-      lastSeenAt: otherUser
-        ? (otherUser.lastSeen || otherUser.lastSeenAt || null)
-        : null,
+      name: otherUser ? (otherUser.name || username) : username,
       avatar: otherUser ? (otherUser.avatar || "") : "",
       bio: otherUser ? (otherUser.bio || "") : "",
+      isOnline: !!(otherUser && otherUser.isOnline),
+      lastSeenAt: otherUser ? (otherUser.lastSeen || otherUser.lastSeenAt || null) : null,
       unreadCount: myUnread,
       preview:
         (raw.lastMessage && (raw.lastMessage.content || raw.lastMessage.text)) ||
@@ -171,24 +194,34 @@
     };
   }
 
+  function getAvatarHtml(chat) {
+    if (chat.avatar) {
+      return (
+        '<div class="avatar">' +
+          '<img src="' + escAttr(chat.avatar) + '" alt="avatar" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">' +
+        "</div>"
+      );
+    }
+
+    return (
+      '<div class="avatar">' +
+        esc((chat.username || chat.name || "U").charAt(0).toUpperCase()) +
+      "</div>"
+    );
+  }
+
   function renderDMList(chats) {
     var dmList = qid("dmContent");
     if (!dmList) return;
 
     dmList.innerHTML = "";
+    chats = sortChatsByLatest(chats);
 
     if (!chats.length) {
       dmList.innerHTML =
         '<div style="padding:24px 18px;color:rgba(255,255,255,0.55);text-align:center;">No real chats yet. Search a user and send a message.</div>';
       return;
     }
-
-    // ADDED: sort chats by time (latest first). Null times go to the end.
-    chats.sort(function (a, b) {
-      var ta = a.time ? new Date(a.time).getTime() : 0;
-      var tb = b.time ? new Date(b.time).getTime() : 0;
-      return tb - ta;
-    });
 
     chats.forEach(function (chat) {
       chatMeta[chat.roomId] = chat;
@@ -198,32 +231,20 @@
       item.setAttribute("data-userid", chat.userId);
       item.setAttribute("data-room", chat.roomId);
 
-      // Avatar: image when available, else initial
-      var avatarHtml = '';
-      if (chat.avatar) {
-        avatarHtml = '<div class="avatar"><img src="' + esc(chat.avatar) + '" alt="avatar" style="width:100%;height:100%;border-radius:50%;object-fit:cover;"></div>';
-      } else {
-        avatarHtml = '<div class="avatar">' + esc((chat.username || "U").charAt(0).toUpperCase()) + '</div>';
-      }
-
       item.innerHTML =
         '<div class="avatar-wrap">' +
-          avatarHtml +
+          getAvatarHtml(chat) +
           (chat.unreadCount > 0
             ? '<div class="unread-badge">' + chat.unreadCount + "</div>"
             : "") +
         "</div>" +
         '<div class="conv-info">' +
           '<div class="conv-name">' + esc(chat.username) + "</div>" +
-          '<div class="conv-preview">' +
-            esc(chat.preview || "Tap to chat") +
-          "</div>" +
+          '<div class="conv-preview">' + esc(chat.preview || "Tap to chat") + "</div>" +
         "</div>" +
         '<div class="conv-meta">' +
           '<div style="display:flex;align-items:center;gap:5px">' +
-            '<span class="conv-time">' +
-              esc(chat.time ? formatTime(chat.time) : "Now") +
-            "</span>" +
+            '<span class="conv-time">' + esc(chat.time ? formatTime(chat.time) : "Now") + "</span>" +
             (chat.isOnline ? '<div class="online-dot"></div>' : "") +
           "</div>" +
           (chat.unreadCount > 0
@@ -236,9 +257,11 @@
           {
             userId: chat.userId,
             username: chat.username,
+            name: chat.name,
+            avatar: chat.avatar,
+            bio: chat.bio,
             isOnline: chat.isOnline,
-            lastSeenAt: chat.lastSeenAt,
-            avatar: chat.avatar
+            lastSeenAt: chat.lastSeenAt
           },
           chat.roomId
         );
@@ -250,16 +273,7 @@
 
   async function refreshDMList() {
     var chats = await fetchChats();
-    var normalized = chats.map(normalizeChat);
-
-    // ADDED: ensure stable sort here as well (safety)
-    normalized.sort(function (a, b) {
-      var ta = a.time ? new Date(a.time).getTime() : 0;
-      var tb = b.time ? new Date(b.time).getTime() : 0;
-      return tb - ta;
-    });
-
-    renderDMList(normalized);
+    renderDMList(chats.map(normalizeChat));
   }
 
   async function markSeen(roomId) {
@@ -288,47 +302,37 @@
       statusEl.style.color = "#2ee67e";
     } else {
       statusEl.textContent = timeAgoText(userObj && userObj.lastSeenAt);
-      statusEl.style.color = "rgba(255,255,255,0.6)";
+      statusEl.style.color = "rgba(255,255,255,0.65)";
     }
   }
 
-  function upsertDMPreview(roomId, userObj, text, createdAt) {
+  function updateChatListItem(roomId, userObj, text, createdAt) {
     if (!roomId) return;
 
     chatMeta[roomId] = chatMeta[roomId] || {};
     chatMeta[roomId].preview = text || "";
     chatMeta[roomId].time = createdAt || new Date().toISOString();
+
     if (userObj && typeof userObj.isOnline !== "undefined") {
       chatMeta[roomId].isOnline = !!userObj.isOnline;
     }
+
     if (userObj && userObj.lastSeenAt) {
       chatMeta[roomId].lastSeenAt = userObj.lastSeenAt;
     }
 
-    var item =
-      qs('[data-room="' + roomId + '"]') ||
-      qs('[data-userid="' + (userObj && userObj.userId ? userObj.userId : "") + '"]');
+    var item = qs('[data-room="' + roomId + '"]');
+    var dmList = qid("dmContent");
 
-    // If item exists update its preview and time & move to top
-    if (!item) {
-      // nothing to move, will be handled on next refresh
-      return;
-    }
+    if (!item || !dmList) return;
 
     var previewEl = item.querySelector(".conv-preview");
     var timeEl = item.querySelector(".conv-time");
-    var dmList = qid("dmContent");
 
     if (previewEl) previewEl.textContent = text || "";
+    if (timeEl) timeEl.textContent = formatTime(createdAt || new Date().toISOString());
 
-    if (timeEl) {
-      timeEl.textContent = formatTime(createdAt || new Date().toISOString());
-    }
-
-    // Move item to top so user sees latest message instantly
-    if (dmList) {
-      dmList.insertBefore(item, dmList.firstChild);
-    }
+    dmList.insertBefore(item, dmList.firstChild);
   }
 
   function replaceTempMessage(roomId, tempId, realMessage, myId) {
@@ -343,7 +347,7 @@
           : String(realMessage.sender || "");
 
       return {
-        id: realMessage._id,
+        id: String(realMessage._id),
         text: realMessage.content || "",
         isMe: senderId === String(myId),
         time: formatTime(realMessage.createdAt),
@@ -370,26 +374,35 @@
     });
   }
 
+  function getHeaderAvatar(userObj) {
+    if (userObj.avatar) {
+      return (
+        '<div style="width:42px;height:42px;border-radius:50%;overflow:hidden;border:2px solid rgba(0,100,220,0.4);flex-shrink:0;">' +
+          '<img src="' + escAttr(userObj.avatar) + '" alt="avatar" style="width:100%;height:100%;object-fit:cover;">' +
+        "</div>"
+      );
+    }
+
+    return (
+      '<div style="width:42px;height:42px;border-radius:50%;background:linear-gradient(135deg,#1a3a6a,#0d1f3c);border:2px solid rgba(0,100,220,0.4);display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:700;color:#4db8ff;flex-shrink:0;">' +
+        esc((userObj.username || userObj.name || "U").charAt(0).toUpperCase()) +
+      "</div>"
+    );
+  }
+
   function openChatPage(userObj, roomId) {
     var phone = qs(".phone");
     if (!phone || !roomId) return;
 
     currentRoomId = roomId;
+    currentChatUser = userObj || null;
 
     var old = qid("chatPage");
     if (old) old.remove();
 
     if (!msgStore[roomId]) msgStore[roomId] = [];
 
-    var initial = esc((userObj.username || "U").charAt(0).toUpperCase());
-    var username = esc(userObj.username || "User");
-
-    var avatarHtml = '';
-    if (userObj.avatar) {
-      avatarHtml = '<div style="width:42px;height:42px;border-radius:50%;overflow:hidden;border:2px solid rgba(0,100,220,0.4);flex-shrink:0;"><img src="' + esc(userObj.avatar) + '" alt="avatar" style="width:100%;height:100%;object-fit:cover;"></div>';
-    } else {
-      avatarHtml = '<div style="width:42px;height:42px;border-radius:50%;background:linear-gradient(135deg,#1a3a6a,#0d1f3c);border:2px solid rgba(0,100,220,0.4);display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:700;color:#4db8ff;flex-shrink:0;">' + initial + '</div>';
-    }
+    var username = esc(userObj.username || userObj.name || "User");
 
     var page = document.createElement("div");
     page.id = "chatPage";
@@ -399,11 +412,9 @@
     page.innerHTML =
       '<div id="chatPageHeader" style="display:flex;align-items:center;gap:12px;padding:12px 14px;background:rgba(0,8,28,0.95);border-bottom:1px solid rgba(0,100,255,0.2);flex-shrink:0;">' +
         '<button id="chatBackBtn" style="background:none;border:none;color:#4db8ff;font-size:26px;line-height:1;cursor:pointer;padding:0 6px 0 0;">‹</button>' +
-          avatarHtml +
+        getHeaderAvatar(userObj) +
         '<div style="flex:1;min-width:0;">' +
-          '<div style="color:#fff;font-size:15px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' +
-            username +
-          "</div>" +
+          '<div style="color:#fff;font-size:15px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + username + "</div>" +
           '<div style="color:#00e5ff;font-size:11px;margin-top:1px;" id="chatUserStatus"></div>' +
         "</div>" +
       "</div>" +
@@ -429,16 +440,17 @@
     qid("chatBackBtn").addEventListener("click", function () {
       page.remove();
       currentRoomId = null;
+      currentChatUser = null;
     });
 
     qid("chatSendBtn").addEventListener("click", function () {
-      _send(roomId, userObj);
+      sendMessage(roomId, userObj);
     });
 
     qid("chatInput").addEventListener("keydown", function (e) {
       if (e.key === "Enter") {
         e.preventDefault();
-        _send(roomId, userObj);
+        sendMessage(roomId, userObj);
       }
     });
 
@@ -474,7 +486,7 @@
             : String(m.sender || "");
 
         return {
-          id: m._id,
+          id: String(m._id),
           text: m.content || "",
           isMe: senderId === myId,
           time: formatTime(m.createdAt),
@@ -483,7 +495,7 @@
         };
       });
 
-      _renderMsgs(roomId);
+      renderMsgs(roomId);
       await markSeen(roomId);
       await refreshDMList();
     } catch (e) {
@@ -491,7 +503,7 @@
     }
   }
 
-  function _renderMsgs(roomId) {
+  function renderMsgs(roomId) {
     var area = qid("chatMsgsArea");
     if (!area) return;
 
@@ -503,6 +515,7 @@
       if (status === "seen") return "✓✓";
       if (status === "sending") return "⌛";
       if (status === "failed") return "!";
+      if (status === "delivered") return "✓✓";
       return "✓";
     }
 
@@ -536,9 +549,7 @@
           '<div style="font-size:10px;color:rgba(255,255,255,0.38);margin-top:3px;text-align:right;display:flex;align-items:center;justify-content:flex-end;gap:3px;">' +
             esc(msg.time || "") +
             (msg.isMe
-              ? '<span style="color:rgba(100,180,255,0.7);">' +
-                  esc(getTick(msg.status)) +
-                "</span>"
+              ? '<span style="color:rgba(100,180,255,0.7);">' + esc(getTick(msg.status)) + "</span>"
               : "") +
           "</div>" +
         "</div>";
@@ -549,9 +560,10 @@
     area.scrollTop = area.scrollHeight;
   }
 
-  async function _send(roomId, userObj) {
+  async function sendMessage(roomId, userObj) {
     var input = qid("chatInput");
     var text = (input ? input.value : "").trim();
+
     if (!text) return;
 
     var sess = getSession();
@@ -571,10 +583,10 @@
       createdAt: nowIso
     });
 
-    upsertDMPreview(roomId, userObj, text, nowIso);
+    updateChatListItem(roomId, userObj, text, nowIso);
 
     if (input) input.value = "";
-    _renderMsgs(roomId);
+    renderMsgs(roomId);
 
     var btn = qid("chatSendBtn");
     if (btn) {
@@ -601,14 +613,14 @@
       var m = data.message || {};
 
       replaceTempMessage(roomId, tempId, m, sess.userId);
-      upsertDMPreview(roomId, userObj, m.content || text, m.createdAt || nowIso);
+      updateChatListItem(roomId, userObj, m.content || text, m.createdAt || nowIso);
 
-      _renderMsgs(roomId);
+      renderMsgs(roomId);
       await refreshDMList();
     } catch (err) {
       console.error("Send message error:", err);
       markTempFailed(roomId, tempId);
-      _renderMsgs(roomId);
+      renderMsgs(roomId);
     } finally {
       if (btn) {
         btn.disabled = false;
@@ -643,9 +655,12 @@
       var meta = chatMeta[roomId] || {
         roomId: roomId,
         userId: userObj.userId,
-        username: userObj.username,
-        isOnline: userObj.isOnline,
-        lastSeenAt: userObj.lastSeenAt
+        username: userObj.username || userObj.name,
+        name: userObj.name || userObj.username,
+        avatar: userObj.avatar || "",
+        bio: userObj.bio || "",
+        isOnline: !!userObj.isOnline,
+        lastSeenAt: userObj.lastSeen || userObj.lastSeenAt || null
       };
 
       openChatPage(meta, roomId);
@@ -656,8 +671,104 @@
     }
   };
 
+  function handleSocketMessage(msg) {
+    var sess = getSession();
+    if (!msg || !sess) return;
+
+    if (msg.type === "message" && msg.room) {
+      var senderId = String(msg.sender || "");
+
+      if (senderId === String(sess.userId)) {
+        return;
+      }
+
+      if (!msgStore[msg.room]) msgStore[msg.room] = [];
+
+      var exists = msgStore[msg.room].some(function (m) {
+        return String(m.id) === String(msg._id || "");
+      });
+
+      if (!exists) {
+        msgStore[msg.room].push({
+          id: String(msg._id || Date.now()),
+          text: msg.text || msg.content || "",
+          isMe: false,
+          time: formatTime(msg.createdAt || new Date().toISOString()) || nowTime(),
+          status: msg.status || "sent",
+          createdAt: msg.createdAt || new Date().toISOString()
+        });
+      }
+
+      if (chatMeta[msg.room]) {
+        chatMeta[msg.room].preview = msg.text || msg.content || "";
+        chatMeta[msg.room].time = msg.createdAt || new Date().toISOString();
+      }
+
+      updateChatListItem(
+        msg.room,
+        chatMeta[msg.room] || {},
+        msg.text || msg.content || "",
+        msg.createdAt || new Date().toISOString()
+      );
+
+      if (currentRoomId === msg.room) {
+        renderMsgs(msg.room);
+        markSeen(msg.room);
+      }
+
+      refreshDMList();
+    }
+
+    if (msg.type === "seen" && msg.room) {
+      if (msgStore[msg.room]) {
+        msgStore[msg.room] = msgStore[msg.room].map(function (m) {
+          if (m.isMe) {
+            m.status = "seen";
+          }
+          return m;
+        });
+      }
+
+      if (currentRoomId === msg.room) {
+        renderMsgs(msg.room);
+      }
+
+      refreshDMList();
+    }
+
+    if (msg.type === "presence" && msg.userId) {
+      Object.keys(chatMeta).forEach(function (roomId) {
+        if (String(chatMeta[roomId].userId) === String(msg.userId)) {
+          chatMeta[roomId].isOnline = !!msg.isOnline;
+          chatMeta[roomId].lastSeenAt = msg.lastSeen || null;
+        }
+      });
+
+      if (currentRoomId && chatMeta[currentRoomId] && String(chatMeta[currentRoomId].userId) === String(msg.userId)) {
+        currentChatUser = chatMeta[currentRoomId];
+        renderUserStatus(currentChatUser);
+      }
+
+      refreshDMList();
+    }
+  }
+
+  document.addEventListener("profile:updated", function (e) {
+    var updated = (e && e.detail) || {};
+    var sess = getSession() || {};
+
+    if (updated.name) sess.name = updated.name;
+    if (updated.username) sess.username = updated.username;
+    if (typeof updated.bio === "string") sess.bio = updated.bio;
+    if (typeof updated.avatar === "string") sess.avatar = updated.avatar;
+
+    saveSessionSafe(sess);
+    renderProfile(sess);
+  });
+
   document.addEventListener("DOMContentLoaded", async function () {
     var sess = getSession();
+
     if (!sess) {
       window.location.replace("./index.html");
       return;
@@ -668,83 +779,16 @@
 
     try {
       if (window.VibeSocket && typeof window.VibeSocket.connect === "function") {
-        window.VibeSocket.connect(sess.token, async function (msg) {
-          if (!msg) return;
-
-          // MESSAGE
-          if (msg.type === "message" && msg.room) {
-            if (!msgStore[msg.room]) msgStore[msg.room] = [];
-
-            var exists = msgStore[msg.room].some(function (m) {
-              return String(m.id) === String(msg._id || "");
-            });
-
-            if (!exists) {
-              msgStore[msg.room].push({
-                id: msg._id || Date.now(),
-                text: msg.text || msg.content || "",
-                isMe: false,
-                time: formatTime(msg.createdAt || new Date().toISOString()) || nowTime(),
-                status: msg.status || "sent",
-                createdAt: msg.createdAt || new Date().toISOString()
-              });
-            }
-
-            if (chatMeta[msg.room]) {
-              chatMeta[msg.room].preview = msg.text || msg.content || "";
-              chatMeta[msg.room].time = msg.createdAt || new Date().toISOString();
-            }
-
-            if (currentRoomId === msg.room) {
-              _renderMsgs(msg.room);
-              await markSeen(msg.room);
-            }
-
-            // Move chat to top instantly via preview upsert
-            upsertDMPreview(msg.room, { userId: (chatMeta[msg.room] && chatMeta[msg.room].userId) }, chatMeta[msg.room] ? chatMeta[msg.room].preview : (msg.text || msg.content || ""), msg.createdAt || new Date().toISOString());
-
-            await refreshDMList();
-          }
-
-          // SEEN
-          if (msg.type === "seen" && msg.room) {
-            if (msgStore[msg.room]) {
-              msgStore[msg.room] = msgStore[msg.room].map(function (m) {
-                if (m.isMe) {
-                  m.status = "seen";
-                }
-                return m;
-              });
-            }
-
-            if (currentRoomId === msg.room) {
-              _renderMsgs(msg.room);
-            }
-
-            await refreshDMList();
-          }
-
-          // PRESENCE
-          if (msg.type === "presence" && msg.userId) {
-            // Update any chatMeta entries for this userId
-            Object.keys(chatMeta).forEach(function (r) {
-              if (chatMeta[r].userId === String(msg.userId)) {
-                chatMeta[r].isOnline = !!msg.isOnline;
-                chatMeta[r].lastSeenAt = msg.lastSeen || null;
-              }
-            });
-
-            // If currently open chat belongs to that user, update header
-            if (currentRoomId && chatMeta[currentRoomId] && chatMeta[currentRoomId].userId === String(msg.userId)) {
-              renderUserStatus(chatMeta[currentRoomId]);
-            }
-
-            await refreshDMList();
-          }
-        });
+        window.VibeSocket.connect(sess.token, handleSocketMessage);
       }
     } catch (e) {
       console.error("[Socket]", e);
     }
+
+    setInterval(function () {
+      if (currentRoomId && currentChatUser) {
+        renderUserStatus(currentChatUser);
+      }
+    }, 60000);
   });
 })();
