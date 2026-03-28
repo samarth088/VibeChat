@@ -1,58 +1,45 @@
-// ================================
-// VibeChat Express App Config
-// ================================
+require("./config/env");
 
-const express = require("express");
-const cors = require("cors");
+const http = require("http");
+const app = require("./app");
+const { connectDB } = require("./config/db");
+const { Server } = require("socket.io");
+const { initSocket } = require("./socket/socket");
 
-const authRoutes = require("./routes/auth.routes");
-const userRoutes = require("./routes/user.routes");
-const chatRoutes = require("./routes/chat.routes");
-const groupRoutes = require("./routes/group.routes");
+const PORT = process.env.PORT || 10000;
 
-const errorMiddleware = require("./middleware/error.middleware");
+async function startServer() {
+  try {
+    console.log("🚀 Starting backend...");
 
-const app = express();
+    await connectDB();
 
-// ================= MIDDLEWARE =================
+    const server = http.createServer(app);
 
-app.use(cors({
-  origin: "*",
-  methods: ["GET", "POST", "PUT", "PATCH", "DELETE"],
-  credentials: true
-}));
+    const io = new Server(server, {
+      cors: {
+        origin: "*",
+        methods: ["GET", "POST", "PUT", "PATCH", "DELETE"]
+      }
+    });
 
-// UPDATED: base64 avatar support
-app.use(express.json({ limit: "15mb" }));
-app.use(express.urlencoded({ extended: true, limit: "15mb" }));
+    // ADDED
+    app.set("io", io);
 
-// ================= HEALTH CHECK =================
+    initSocket(io);
 
-app.get("/", (req, res) => {
-  res.status(200).json({
-    status: "success",
-    message: "🚀 VibeChat Backend Running"
-  });
-});
+    server.listen(PORT, "0.0.0.0", function () {
+      console.log("✅ Server running on port " + PORT);
+    });
 
-// ================= API ROUTES =================
+    server.on("error", function (err) {
+      console.error("❌ Server listen error:", err);
+      process.exit(1);
+    });
+  } catch (err) {
+    console.error("❌ Fatal startup error:", err);
+    process.exit(1);
+  }
+}
 
-app.use("/api/auth", authRoutes);
-app.use("/api/users", userRoutes);
-app.use("/api/chats", chatRoutes);
-app.use("/api/groups", groupRoutes);
-app.use("/api/messages", require("./routes/message.routes"));
-
-// ================= 404 HANDLER =================
-
-app.use((req, res) => {
-  res.status(404).json({
-    error: "Route not found"
-  });
-});
-
-// ================= ERROR HANDLER =================
-
-app.use(errorMiddleware);
-
-module.exports = app;
+startServer();
