@@ -1,139 +1,377 @@
-// ADDED
 (function () {
-  function qid(id) { return document.getElementById(id); }
-  function qs(sel) { return document.querySelector(sel); }
+  var editorState = {
+    currentAvatar: "",
+    selectedAvatarData: ""
+  };
+
+  function esc(t) {
+    return String(t || "")
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;");
+  }
+
+  function escAttr(t) {
+    return String(t || "")
+      .replace(/&/g, "&amp;")
+      .replace(/"/g, "&quot;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;");
+  }
+
+  function getSession() {
+    return window.VibeState && window.VibeState.loadSession
+      ? window.VibeState.loadSession()
+      : null;
+  }
+
+  function saveSessionSafe(sess) {
+    if (window.VibeState && typeof window.VibeState.saveSession === "function") {
+      window.VibeState.saveSession(sess);
+    }
+  }
+
+  function showToast(message) {
+    if (window.showToast) {
+      window.showToast(message);
+      return;
+    }
+
+    var old = document.getElementById("vibeProfileToast");
+    if (old) old.remove();
+
+    var toast = document.createElement("div");
+    toast.id = "vibeProfileToast";
+    toast.textContent = message;
+    toast.style.cssText =
+      "position:fixed;left:50%;bottom:24px;transform:translateX(-50%);z-index:99999;" +
+      "background:rgba(0,12,40,0.96);color:#fff;padding:10px 14px;border-radius:12px;" +
+      "border:1px solid rgba(0,128,255,0.35);font-size:13px;box-shadow:0 10px 30px rgba(0,0,0,0.35);";
+
+    document.body.appendChild(toast);
+
+    setTimeout(function () {
+      toast.remove();
+    }, 2200);
+  }
+
+  function getInitials(user) {
+    var base = user.username || user.name || "U";
+    return String(base).charAt(0).toUpperCase();
+  }
+
+  function setAvatarNode(node, avatar, fallbackText) {
+    if (!node) return;
+
+    if (avatar) {
+      if (node.tagName === "IMG") {
+        node.src = avatar;
+      } else {
+        node.innerHTML = '<img src="' + escAttr(avatar) + '" alt="avatar" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">';
+      }
+      return;
+    }
+
+    if (node.tagName === "IMG") {
+      node.removeAttribute("src");
+    } else {
+      node.innerHTML = esc(fallbackText || "U");
+    }
+  }
+
+  function applyProfileToUI(user) {
+    if (!user) return;
+
+    var allName = document.querySelectorAll(".profile-name, [data-profile-name], #profileName, #userProfileName");
+    var allUid = document.querySelectorAll(".profile-uid, [data-profile-uid], #profileUid, #userProfileUid");
+    var allBio = document.querySelectorAll(".profile-bio, [data-profile-bio], #profileBio, #userProfileBio");
+    var allAvatar = document.querySelectorAll(".profile-avatar-big, .profile-avatar, [data-profile-avatar], #profileAvatar, #userProfileAvatar");
+
+    Array.prototype.forEach.call(allName, function (el) {
+      el.textContent = user.name || user.username || "User";
+    });
+
+    Array.prototype.forEach.call(allUid, function (el) {
+      var idText = user.uid || user.userId || "";
+      el.textContent = "@" + (user.username || "user") + (idText ? " · ID: " + idText : "");
+    });
+
+    Array.prototype.forEach.call(allBio, function (el) {
+      el.textContent = user.bio || "🚀 Add your bio";
+    });
+
+    Array.prototype.forEach.call(allAvatar, function (el) {
+      setAvatarNode(el, user.avatar || "", getInitials(user));
+    });
+  }
 
   async function loadProfile() {
     try {
-      var sess = window.VibeState && window.VibeState.loadSession ? window.VibeState.loadSession() : null;
-      if (!sess) return;
+      var sess = getSession();
+      if (!sess || !sess.token || !window.VibeAPI || !window.VibeAPI.getMyProfile) return null;
 
-      var profile = await window.VibeAPI.getMyProfile(sess.token);
-      if (!profile) return;
+      var user = await window.VibeAPI.getMyProfile(sess.token);
 
-      // Fill UI fields (IDs used below should match HTML)
-      var nameEl = qid("profileNameInput");
-      var usernameEl = qid("profileUsernameInput");
-      var bioEl = qid("profileBioInput");
-      var avatarImg = qid("profileAvatarImg");
-      var idText = qid("profileUid");
+      if (user) {
+        var merged = {
+          userId: sess.userId,
+          uid: user.uid || sess.uid || "",
+          name: user.name || sess.name || "",
+          username: user.username || sess.username || "",
+          bio: user.bio || "",
+          avatar: user.avatar || ""
+        };
 
-      if (nameEl) nameEl.value = profile.name || "";
-      if (usernameEl) usernameEl.value = profile.username || "";
-      if (bioEl) bioEl.value = profile.bio || "";
-      if (avatarImg) {
-        if (profile.avatar) {
-          avatarImg.src = profile.avatar;
-        } else {
-          avatarImg.src = "/assets/images/default-avatar.png";
-        }
+        sess.name = merged.name;
+        sess.username = merged.username;
+        sess.bio = merged.bio;
+        sess.avatar = merged.avatar;
+        sess.uid = merged.uid;
+
+        saveSessionSafe(sess);
+        applyProfileToUI(merged);
+        return merged;
       }
-      if (idText) idText.textContent = profile.uid ? ("ID: " + profile.uid) : "";
-    } catch (e) {
-      console.error("Failed to load profile:", e);
+
+      return null;
+    } catch (err) {
+      console.error("Profile load error:", err);
+      return null;
     }
   }
 
-  function readFileAsDataURL(file) {
-    return new Promise(function (resolve, reject) {
-      var fr = new FileReader();
-      fr.onload = function () { resolve(fr.result); };
-      fr.onerror = function (err) { reject(err); };
-      fr.readAsDataURL(file);
-    });
+  function ensureEditorStyles() {
+    if (document.getElementById("vibeProfileEditorStyles")) return;
+
+    var style = document.createElement("style");
+    style.id = "vibeProfileEditorStyles";
+    style.textContent =
+      "#vibeProfileEditorOverlay{position:fixed;inset:0;background:rgba(0,0,0,0.72);z-index:99998;display:none;align-items:center;justify-content:center;padding:18px;}" +
+      "#vibeProfileEditor{width:min(420px,100%);background:linear-gradient(180deg,#00173d 0%,#000d24 100%);border:1px solid rgba(0,125,255,0.28);border-radius:22px;box-shadow:0 20px 60px rgba(0,0,0,0.45);overflow:hidden;color:#fff;}" +
+      "#vibeProfileEditorHeader{padding:16px 18px;border-bottom:1px solid rgba(0,125,255,0.18);font-size:18px;font-weight:700;}" +
+      "#vibeProfileEditorBody{padding:18px;display:flex;flex-direction:column;gap:12px;}" +
+      ".vibeProfileField label{display:block;font-size:12px;color:rgba(255,255,255,0.7);margin-bottom:6px;}" +
+      ".vibeProfileField input,.vibeProfileField textarea{width:100%;background:rgba(255,255,255,0.06);border:1px solid rgba(0,125,255,0.24);border-radius:14px;color:#fff;padding:12px 14px;font-size:14px;outline:none;box-sizing:border-box;}" +
+      ".vibeProfileField textarea{min-height:88px;resize:none;}" +
+      "#vibeProfileEditorAvatarPreview{width:84px;height:84px;border-radius:50%;margin:0 auto 4px;background:rgba(255,255,255,0.06);border:2px solid rgba(0,125,255,0.3);overflow:hidden;display:flex;align-items:center;justify-content:center;font-size:34px;font-weight:700;color:#4db8ff;}" +
+      "#vibeProfileEditorActions{display:flex;gap:10px;padding:0 18px 18px;}" +
+      ".vibeProfileBtn{flex:1;border:none;border-radius:14px;padding:12px 14px;font-size:14px;font-weight:700;cursor:pointer;}" +
+      ".vibeProfileBtnCancel{background:rgba(255,255,255,0.08);color:#fff;}" +
+      ".vibeProfileBtnSave{background:linear-gradient(135deg,#0c8dff,#005cff);color:#fff;}" +
+      ".vibeProfileMiniBtn{display:inline-flex;align-items:center;justify-content:center;padding:10px 12px;border-radius:12px;border:1px solid rgba(0,125,255,0.26);background:rgba(255,255,255,0.04);color:#fff;font-size:12px;cursor:pointer;}";
+    document.head.appendChild(style);
   }
 
-  async function saveProfile() {
+  function ensureEditor() {
+    ensureEditorStyles();
+
+    if (document.getElementById("vibeProfileEditorOverlay")) {
+      return;
+    }
+
+    var overlay = document.createElement("div");
+    overlay.id = "vibeProfileEditorOverlay";
+    overlay.innerHTML =
+      '<div id="vibeProfileEditor">' +
+        '<div id="vibeProfileEditorHeader">Edit Profile</div>' +
+        '<div id="vibeProfileEditorBody">' +
+          '<div id="vibeProfileEditorAvatarPreview">U</div>' +
+
+          '<div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap;">' +
+            '<label class="vibeProfileMiniBtn" for="vibeProfileAvatarFile">Choose Photo</label>' +
+            '<input id="vibeProfileAvatarFile" type="file" accept="image/*" style="display:none;">' +
+          '</div>' +
+
+          '<div class="vibeProfileField">' +
+            '<label for="vibeProfileAvatarUrl">Profile Picture URL (optional)</label>' +
+            '<input id="vibeProfileAvatarUrl" type="text" placeholder="https://example.com/avatar.png">' +
+          '</div>' +
+
+          '<div class="vibeProfileField">' +
+            '<label for="vibeProfileName">Name</label>' +
+            '<input id="vibeProfileName" type="text" maxlength="60" placeholder="Your name">' +
+          '</div>' +
+
+          '<div class="vibeProfileField">' +
+            '<label for="vibeProfileUsername">Username</label>' +
+            '<input id="vibeProfileUsername" type="text" maxlength="30" placeholder="username">' +
+          '</div>' +
+
+          '<div class="vibeProfileField">' +
+            '<label for="vibeProfileBio">Bio</label>' +
+            '<textarea id="vibeProfileBio" maxlength="180" placeholder="Write something about yourself"></textarea>' +
+          '</div>' +
+        '</div>' +
+
+        '<div id="vibeProfileEditorActions">' +
+          '<button type="button" class="vibeProfileBtn vibeProfileBtnCancel" id="vibeProfileCancelBtn">Cancel</button>' +
+          '<button type="button" class="vibeProfileBtn vibeProfileBtnSave" id="vibeProfileSaveBtn">Save Changes</button>' +
+        '</div>' +
+      "</div>";
+
+    document.body.appendChild(overlay);
+
+    overlay.addEventListener("click", function (e) {
+      if (e.target === overlay) {
+        closeEditor();
+      }
+    });
+
+    document.getElementById("vibeProfileCancelBtn").addEventListener("click", closeEditor);
+
+    document.getElementById("vibeProfileAvatarUrl").addEventListener("input", function () {
+      var url = this.value.trim();
+      if (url) {
+        editorState.selectedAvatarData = "";
+        renderEditorAvatar(url);
+      } else {
+        renderEditorAvatar(editorState.currentAvatar || "");
+      }
+    });
+
+    document.getElementById("vibeProfileAvatarFile").addEventListener("change", function () {
+      var file = this.files && this.files[0];
+      if (!file) return;
+
+      var reader = new FileReader();
+      reader.onload = function () {
+        editorState.selectedAvatarData = reader.result;
+        document.getElementById("vibeProfileAvatarUrl").value = "";
+        renderEditorAvatar(reader.result);
+      };
+      reader.readAsDataURL(file);
+    });
+
+    document.getElementById("vibeProfileSaveBtn").addEventListener("click", saveEditor);
+  }
+
+  function renderEditorAvatar(value) {
+    var preview = document.getElementById("vibeProfileEditorAvatarPreview");
+    if (!preview) return;
+
+    var sess = getSession() || {};
+    var fallback = (sess.username || sess.name || "U").charAt(0).toUpperCase();
+
+    if (value) {
+      preview.innerHTML = '<img src="' + escAttr(value) + '" alt="avatar" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">';
+    } else {
+      preview.textContent = fallback;
+    }
+  }
+
+  async function openEditor() {
+    ensureEditor();
+
+    var overlay = document.getElementById("vibeProfileEditorOverlay");
+    var sess = getSession() || {};
+    var profile = await loadProfile();
+
+    var current = profile || {
+      name: sess.name || "",
+      username: sess.username || "",
+      bio: sess.bio || "",
+      avatar: sess.avatar || ""
+    };
+
+    editorState.currentAvatar = current.avatar || "";
+    editorState.selectedAvatarData = "";
+
+    document.getElementById("vibeProfileName").value = current.name || "";
+    document.getElementById("vibeProfileUsername").value = current.username || "";
+    document.getElementById("vibeProfileBio").value = current.bio || "";
+    document.getElementById("vibeProfileAvatarUrl").value = "";
+    document.getElementById("vibeProfileAvatarFile").value = "";
+
+    renderEditorAvatar(current.avatar || "");
+    overlay.style.display = "flex";
+  }
+
+  function closeEditor() {
+    var overlay = document.getElementById("vibeProfileEditorOverlay");
+    if (overlay) {
+      overlay.style.display = "none";
+    }
+  }
+
+  async function saveEditor() {
     try {
-      var sess = window.VibeState && window.VibeState.loadSession ? window.VibeState.loadSession() : null;
-      if (!sess) return;
+      var sess = getSession();
+      if (!sess || !sess.token) {
+        showToast("Session expired");
+        return;
+      }
 
-      var nameEl = qid("profileNameInput");
-      var usernameEl = qid("profileUsernameInput");
-      var bioEl = qid("profileBioInput");
-      var avatarFileInput = qid("profileAvatarFile");
-      var avatarImg = qid("profileAvatarImg");
+      var name = document.getElementById("vibeProfileName").value.trim();
+      var username = document.getElementById("vibeProfileUsername").value.trim().toLowerCase();
+      var bio = document.getElementById("vibeProfileBio").value.trim();
+      var avatarUrl = document.getElementById("vibeProfileAvatarUrl").value.trim();
 
-      var data = {
-        name: nameEl ? nameEl.value.trim() : undefined,
-        username: usernameEl ? usernameEl.value.trim().toLowerCase() : undefined,
-        bio: bioEl ? bioEl.value : undefined
+      var payload = {
+        name: name,
+        username: username,
+        bio: bio
       };
 
-      // If new avatar file selected -> read as base64 and submit
-      if (avatarFileInput && avatarFileInput.files && avatarFileInput.files[0]) {
-        try {
-          var dataUrl = await readFileAsDataURL(avatarFileInput.files[0]);
-          data.avatar = dataUrl;
-        } catch (err) {
-          console.warn("Avatar read failed", err);
-        }
+      if (editorState.selectedAvatarData) {
+        payload.avatar = editorState.selectedAvatarData;
+      } else if (avatarUrl) {
+        payload.avatar = avatarUrl;
+      } else {
+        payload.avatar = editorState.currentAvatar || "";
       }
 
-      var updated = await window.VibeAPI.updateProfile(data, sess.token);
+      var updated = await window.VibeAPI.updateProfile(payload, sess.token);
 
-      // Update session info stored locally if present
-      if (window.VibeState && typeof window.VibeState.saveSession === "function") {
-        var s = window.VibeState.loadSession() || {};
-        s.username = updated.username || s.username;
-        s.avatar = updated.avatar || s.avatar;
-        window.VibeState.saveSession(s);
-      }
+      sess.name = updated.name || sess.name || "";
+      sess.username = updated.username || sess.username || "";
+      sess.bio = typeof updated.bio === "string" ? updated.bio : (sess.bio || "");
+      sess.avatar = typeof updated.avatar === "string" ? updated.avatar : (sess.avatar || "");
+      sess.uid = updated.uid || sess.uid || "";
 
-      // Reflect updated avatar in UI
-      if (avatarImg && updated.avatar) {
-        avatarImg.src = updated.avatar;
-      }
+      saveSessionSafe(sess);
+      applyProfileToUI(sess);
+      closeEditor();
+      showToast("Profile updated");
 
-      // Optionally show a toast/notice (if overlays.js provides showToast)
-      if (window.showToast) window.showToast("Profile updated");
-
-      // refresh any global profile displays
-      var evt = new CustomEvent("profileUpdated", { detail: updated });
-      document.dispatchEvent(evt);
-
+      document.dispatchEvent(new CustomEvent("profile:updated", {
+        detail: updated
+      }));
     } catch (err) {
-      console.error("Profile save error:", err);
-      var msg = err && err.message ? err.message : "Update failed";
-      if (window.showToast) window.showToast(msg);
-      else alert(msg);
+      console.error("Profile update error:", err);
+      showToast(err && err.message ? err.message : "Profile update failed");
     }
   }
 
-  document.addEventListener("DOMContentLoaded", function () {
-    // Try to load profile when profile UI is present
-    if (document.getElementById("profileNameInput")) {
-      loadProfile();
-    }
+  function bindEditTriggers() {
+    var nodes = document.querySelectorAll("button, a, div, li");
+    Array.prototype.forEach.call(nodes, function (node) {
+      var text = String(node.textContent || "").replace(/\s+/g, " ").trim().toLowerCase();
+      if (!text) return;
+      if (text !== "edit profile" && text.indexOf("edit profile") === -1) return;
+      if (node.dataset.profileTriggerBound === "1") return;
 
-    var saveBtn = qid("profileSaveBtn");
-    if (saveBtn) saveBtn.addEventListener("click", function (e) {
-      e.preventDefault();
-      saveProfile();
-    });
+      node.dataset.profileTriggerBound = "1";
+      node.style.cursor = "pointer";
 
-    // Live avatar preview
-    var avatarFileInput = qid("profileAvatarFile");
-    var avatarImg = qid("profileAvatarImg");
-    if (avatarFileInput && avatarImg) {
-      avatarFileInput.addEventListener("change", function () {
-        var f = avatarFileInput.files && avatarFileInput.files[0];
-        if (!f) return;
-        var reader = new FileReader();
-        reader.onload = function () {
-          avatarImg.src = reader.result;
-        };
-        reader.readAsDataURL(f);
+      node.addEventListener("click", function (e) {
+        e.preventDefault();
+        openEditor();
       });
-    }
-
-    // Allow other parts of app to trigger profile reload
-    document.addEventListener("openProfileEdit", function () {
-      loadProfile();
-      // show profile sheet if you have a sheet component
-      var sheet = document.getElementById("profileSheet");
-      if (sheet && typeof sheet.show === "function") sheet.show();
     });
+  }
+
+  document.addEventListener("vibe:open-profile-editor", function () {
+    openEditor();
   });
 
+  document.addEventListener("DOMContentLoaded", function () {
+    ensureEditor();
+    bindEditTriggers();
+    loadProfile();
+  });
+
+  window.VibeProfile = {
+    openEditor: openEditor,
+    refresh: loadProfile
+  };
 })();
