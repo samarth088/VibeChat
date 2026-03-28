@@ -1,37 +1,58 @@
-// =========================
-// VibeChat Backend Server
-// =========================
+// ================================
+// VibeChat Express App Config
+// ================================
 
-require("dotenv").config();
+const express = require("express");
+const cors = require("cors");
 
-const http = require("http");
-const app = require("./app");
-const { connectDB } = require("./config/db");
+const authRoutes = require("./routes/auth.routes");
+const userRoutes = require("./routes/user.routes");
+const chatRoutes = require("./routes/chat.routes");
+const groupRoutes = require("./routes/group.routes");
 
-// ================= SOCKET.IO =================
-const { Server } = require("socket.io");
-const { initSocket } = require("./socket/socket");
+const errorMiddleware = require("./middleware/error.middleware");
 
-// Create HTTP server
-const server = http.createServer(app);
+const app = express();
 
-// Setup socket server
-const io = new Server(server, {
-  cors: {
-    origin: "*", // later restrict to frontend domain
-    methods: ["GET", "POST"]
-  }
+// ================= MIDDLEWARE =================
+
+app.use(cors({
+  origin: "*",
+  methods: ["GET", "POST", "PUT", "PATCH", "DELETE"],
+  credentials: true
+}));
+
+// UPDATED: base64 avatar support
+app.use(express.json({ limit: "15mb" }));
+app.use(express.urlencoded({ extended: true, limit: "15mb" }));
+
+// ================= HEALTH CHECK =================
+
+app.get("/", (req, res) => {
+  res.status(200).json({
+    status: "success",
+    message: "🚀 VibeChat Backend Running"
+  });
 });
 
-// Initialize socket logic
-initSocket(io);
+// ================= API ROUTES =================
 
-// ================= DATABASE =================
-connectDB();
+app.use("/api/auth", authRoutes);
+app.use("/api/users", userRoutes);
+app.use("/api/chats", chatRoutes);
+app.use("/api/groups", groupRoutes);
+app.use("/api/messages", require("./routes/message.routes"));
 
-// ================= START SERVER =================
-const PORT = process.env.PORT || 10000;
+// ================= 404 HANDLER =================
 
-server.listen(PORT, () => {
-  console.log(`🚀 VibeChat backend running on port ${PORT}`);
+app.use((req, res) => {
+  res.status(404).json({
+    error: "Route not found"
+  });
 });
+
+// ================= ERROR HANDLER =================
+
+app.use(errorMiddleware);
+
+module.exports = app;
