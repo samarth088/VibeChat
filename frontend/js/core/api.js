@@ -1,261 +1,33 @@
-// UPDATED
-// Production-ready API wrapper
-// Load order: env.js → state.js → api.js
+// =========================
+// VibeChat Backend Server
+// =========================
 
-(function () {
+require("dotenv").config();
 
-  var cfg = window.ENV || {};
-  cfg.DEV_MODE = !!cfg.DEV_MODE;   // Strict boolean
-  if (!cfg.API_URL) cfg.API_URL = '';
+const http = require("http");
+const app = require("./app");
+const { connectDB } = require("./config/db");
 
-  function fetchJSON(url, opts) {
-    return fetch(url, opts).then(async function (res) {
-      var data = {};
-      try { data = await res.json(); } catch (e) {}
+const { Server } = require("socket.io");
+const { initSocket } = require("./socket/socket");
 
-      if (!res.ok) {
-        throw new Error(data.message || ('HTTP ' + res.status));
-      }
+const server = http.createServer(app);
 
-      return data;
-    });
+const io = new Server(server, {
+  cors: {
+    origin: "*",
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE"]
   }
+});
 
-  window.VibeAPI = {
+// ADDED
+app.set("io", io);
 
-   sendMessage: function(chatId,text,token){
+initSocket(io);
+connectDB();
 
-  // Token safety fix
-  if(!token){
-    var sess = window.VibeState.loadSession();
-    token = sess && sess.token;
-  }
+const PORT = process.env.PORT || 10000;
 
-  return fetchJSON(cfg.API_URL + "/messages",{
-    method:"POST",
-    headers:{
-      "Content-Type":"application/json",
-      "Authorization":"Bearer " + token
-    },
-    body: JSON.stringify({
-      chatId: chatId,
-      text: text
-    })
-  });
-
-},
-    // ─────────────────────────────────────────
-    // LOGIN
-    // ─────────────────────────────────────────
-    
-login: function (data) {
-
-  var identifier = data.identifier;
-  var password   = data.password;
-
-  if (cfg.DEV_MODE) {
-    return new Promise(function (resolve) {
-      setTimeout(function () {
-        var userId = Math.floor(Math.random() * 90000) + 1;
-        resolve({
-          userId:      userId,
-          idFormatted: window.VibeState.formatId(userId),
-          username:    identifier,
-          token:       'dev-token-' + userId,
-          profile:     { bio: '🚀 Living on vibes.' }
-        });
-      }, 600);
-    });
-  }
-
-  return fetchJSON(cfg.API_URL + '/auth/login', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      email: identifier,   // 🔥 FIX
-      password: password
-    })
-  });
-},
-    // ─────────────────────────────────────────
-    // SEND OTP
-    // ─────────────────────────────────────────
-    sendOTP: function (email) {
-
-      if (!email) {
-        return Promise.reject(new Error("Email is required"));
-      }
-
-      return fetchJSON(cfg.API_URL + '/auth/send-otp', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: email })
-      });
-    },
-
-    // ─────────────────────────────────────────
-    // VERIFY OTP + SIGNUP (2-Step Backend Flow)
-    // ─────────────────────────────────────────
-    verifyOTPAndSignup: function (data) {
-
-      return fetchJSON(cfg.API_URL + '/auth/verify-otp', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          email: data.email,
-          otp:   data.otp
-        })
-      }).then(function () {
-
-        return fetchJSON(cfg.API_URL + '/auth/signup', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            name:     data.fullname,
-            email:    data.email,
-            password: data.password
-          })
-        });
-
-      });
-    },
-
-    // ─────────────────────────────────────────
-    // SEARCH USERS
-    // ─────────────────────────────────────────
-    searchUsers: function (query) {
-
-  if (!query) return Promise.resolve([]);
-
-  var q = String(query).trim();
-
-  return fetchJSON(cfg.API_URL + '/users/search?uid=' + encodeURIComponent(q), {
-    headers: {
-      'Authorization': 'Bearer ' + (window.VibeState.session?.token || '')
-    }
-  }).then(function (res) {
-
-    if (!res.success || !res.user) return [];
-
-    return [{
-      userId:   res.user.id,
-      uid:      res.user.uid,
-      username: res.user.username || res.user.name,
-      avatar:   res.user.avatar || '',
-      online:   res.user.isOnline || false,
-      lastSeen: res.user.lastSeen || null
-    }];
-
-  });
-},
-
-    // ─────────────────────────────────────────
-    // GET USER BY ID
-getUserById: function (userId) {
-
-  if (cfg.DEV_MODE) {
-    return Promise.resolve({
-      userId:      userId,
-      idFormatted: window.VibeState.formatId(userId),
-      username:    'user_' + userId,
-      bio:         'Dev user'
-    });
-  }
-
-  return fetchJSON(cfg.API_URL + '/users/search?uid=' + encodeURIComponent(userId), {
-    headers: {
-      'Authorization': 'Bearer ' + (window.VibeState.session?.token || '')
-    }
-  }).then(function(res){
-
-    if(!res.success || !res.user) throw new Error("User not found");
-
-    return {
-      userId:   res.user.id,
-      uid:      res.user.uid,
-      username: res.user.username,
-      avatar:   res.user.avatar
-    };
-
-  });
-
-},
-
-    // ─────────────────────────────────────────
-    // Get my profile
-    // ─────────────────────────────────────────
-    getMyProfile: function(token){
-      if(!token){
-        var sess = window.VibeState && window.VibeState.loadSession ? window.VibeState.loadSession() : null;
-        token = sess && sess.token;
-      }
-
-      return fetchJSON(cfg.API_URL + '/users/me', {
-        headers: {
-          'Authorization': 'Bearer ' + (token || '')
-        }
-      }).then(function(res){
-        if(!res.success) throw new Error(res.message || "Failed to load profile");
-        return res.user;
-      });
-    },
-
-    // ─────────────────────────────────────────
-    // Update my profile (name, username, bio, avatar)
-    // ─────────────────────────────────────────
-    updateProfile: function(data, token){
-      if(!token){
-        var sess = window.VibeState && window.VibeState.loadSession ? window.VibeState.loadSession() : null;
-        token = sess && sess.token;
-      }
-
-      // data: { name, username, bio, avatar }
-      return fetchJSON(cfg.API_URL + '/users/me', {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer ' + (token || '')
-        },
-        body: JSON.stringify(data)
-      }).then(function(res){
-        if(!res.success) throw new Error(res.message || "Update failed");
-        return res.user;
-      });
-    },
-
-    // ─────────────────────────────────────────
-    // OPEN CHAT
-openChatWith: function (userId, token) {
-
-  if (cfg.DEV_MODE) {
-    return Promise.resolve({
-      roomId: 'room_' + Math.floor(Math.random() * 1000000)
-    });
-  }
-
-  return fetchJSON(cfg.API_URL + '/chats', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': 'Bearer ' + (token || '')
-    },
-    body: JSON.stringify({
-      otherUserId: userId
-    })
-  }).then(function(res){
-
-    if(!res.roomId){
-      throw new Error("Chat creation failed");
-    }
-
-    return {
-      roomId: res.roomId
-    };
-
-  });
-
-},
-    // CLOSE VibeAPI OBJECT
-  };
-
-})();
+server.listen(PORT, () => {
+  console.log(`🚀 VibeChat backend running on port ${PORT}`);
+});
