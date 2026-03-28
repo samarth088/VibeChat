@@ -16,18 +16,15 @@ const app = express();
 
 // ================= MIDDLEWARE =================
 
-// Enable CORS (Later restrict to frontend domain)
 app.use(cors({
   origin: "*",
-  methods: ["GET", "POST", "PUT", "DELETE"],
+  methods: ["GET", "POST", "PUT", "PATCH", "DELETE"],
   credentials: true
 }));
 
-// Parse JSON
-app.use(express.json());
-
-// Parse URL encoded (form support)
-app.use(express.urlencoded({ extended: true }));
+// UPDATED: base64 avatar support
+app.use(express.json({ limit: "15mb" }));
+app.use(express.urlencoded({ extended: true, limit: "15mb" }));
 
 // ================= HEALTH CHECK =================
 
@@ -45,6 +42,7 @@ app.use("/api/users", userRoutes);
 app.use("/api/chats", chatRoutes);
 app.use("/api/groups", groupRoutes);
 app.use("/api/messages", require("./routes/message.routes"));
+
 // ================= 404 HANDLER =================
 
 app.use((req, res) => {
@@ -52,8 +50,8 @@ app.use((req, res) => {
     error: "Route not found"
   });
 });
+
 // ================= ERROR HANDLER =================
-// (Must be last)
 
 app.use(errorMiddleware);
 
