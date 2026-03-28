@@ -1,156 +1,97 @@
-const Message = require("../models/Message");
-const Chat = require("../models/Chat");
+const { handleChatSocket } = require("./chat.socket");
+const { handleGroupSocket } = require("./group.socket");
 const User = require("../models/User");
 
-const handleChatSocket = (io, socket, onlineUsers) => {
-  socket.on("register", async (userId) => {
-    try {
-      if (!userId) return;
+let onlineUsers = new Map();
 
-      onlineUsers.set(userId.toString(), socket.id);
+function getSocketIdByUserId(userId) {
+  return onlineUsers.get(String(userId)) || null;
+}
 
-      await User.findByIdAndUpdate(userId, {
-        isOnline: true,
-        socketId: socket.id,
-        lastSeen: null
-      });
-
-      io.emit("user-online", userId);
-    } catch (err) {
-      console.error("Register error:", err);
-    }
+function emitPresence(io, userId, isOnline, lastSeen) {
+  io.emit("presence", {
+    type: "presence",
+    userId: String(userId),
+    isOnline: !!isOnline,
+    lastSeen: lastSeen ? new Date(lastSeen).toISOString() : null
   });
+}
 
-  socket.on("private-message", async ({ from, to, text }) => {
-    try {
-      const cleanText = String(text || "").trim();
-      if (!from || !to || !cleanText) return;
+const initSocket = (io) => {
+  io.on("connection", (socket) => {
+    console.log("⚡ User connected:", socket.id);
 
-      let chat = await Chat.findOne({
-        members: { $all: [from, to] }
-      });
+    // UPDATED
+    socket.on("register", async (userId) => {
+      try {
+        if (!userId) return;
 
-      if (!chat) {
-        chat = await Chat.create({
-          members: [from, to],
-          unreadCounts: new Map([
-            [from.toString(), 0],
-            [to.toString(), 0]
-          ])
+        const cleanUserId = String(userId);
+        socket.data.userId = cleanUserId;
+        onlineUsers.set(cleanUserId, socket.id);
+
+        await User.findByIdAndUpdate(cleanUserId, {
+          isOnline: true,
+          status: "online",
+          socketId: socket.id,
+          lastSeen: null
         });
+
+        emitPresence(io, cleanUserId, true, null);
+        console.log("🟢 Registered:", cleanUserId);
+      } catch (err) {
+        console.error("Register socket error:", err);
       }
+    });
 
-      const message = await Message.create({
-        chat: chat._id,
-        sender: from,
-        receiver: to,
-        content: cleanText,
-        status: "sent"
-      });
+    // ADDED
+    socket.on("join", (roomId) => {
+      if (!roomId) return;
+      socket.join(String(roomId));
+    });
 
-      chat.lastMessage = message._id;
-      chat.updatedAt = new Date();
+    handleChatSocket(io, socket, onlineUsers);
+    handleGroupSocket(io, socket, onlineUsers);
 
-      const currentUnread = chat.unreadCounts.get(to.toString()) || 0;
-      chat.unreadCounts.set(to.toString(), currentUnread + 1);
+    socket.on("disconnect", async () => {
+      try {
+        let disconnectedUserId = socket.data && socket.data.userId
+          ? String(socket.data.userId)
+          : null;
 
-      await chat.save();
-
-      const receiverSocket = onlineUsers.get(to.toString());
-
-      if (receiverSocket) {
-        message.status = "delivered";
-        message.deliveredAt = new Date();
-        await message.save();
-
-        io.to(receiverSocket).emit("private-message", {
-          _id: message._id,
-          chat: String(chat._id),
-          sender: from,
-          receiver: to,
-          content: cleanText,
-          status: message.status,
-          createdAt: message.createdAt
-        });
-
-        io.to(receiverSocket).emit("unread-update", {
-          chatId: String(chat._id),
-          unread: chat.unreadCounts.get(to.toString()) || 0
-        });
-      }
-
-      socket.emit("message-sent", {
-        _id: message._id,
-        chat: String(chat._id),
-        sender: from,
-        receiver: to,
-        content: cleanText,
-        status: message.status,
-        createdAt: message.createdAt
-      });
-    } catch (err) {
-      console.error("Private message error:", err);
-    }
-  });
-
-  socket.on("message-seen", async (msgId) => {
-    try {
-      const message = await Message.findById(msgId);
-      if (!message) return;
-      if (message.status === "seen") return;
-
-      message.status = "seen";
-      message.seenAt = new Date();
-      await message.save();
-
-      const chat = await Chat.findById(message.chat);
-      if (chat) {
-        chat.unreadCounts.set(message.receiver.toString(), 0);
-        chat.updatedAt = new Date();
-        await chat.save();
-
-        socket.emit("unread-update", {
-          chatId: String(chat._id),
-          unread: 0
-        });
-      }
-
-      const senderSocket = onlineUsers.get(message.sender.toString());
-      if (senderSocket) {
-        io.to(senderSocket).emit("message-seen", {
-          msgId: String(message._id),
-          chatId: String(message.chat)
-        });
-      }
-    } catch (err) {
-      console.error("Seen error:", err);
-    }
-  });
-
-  socket.on("disconnect", async () => {
-    try {
-      for (const [userId, sockId] of onlineUsers.entries()) {
-        if (sockId === socket.id) {
-          onlineUsers.delete(userId);
-
-          await User.findByIdAndUpdate(userId, {
-            isOnline: false,
-            socketId: null,
-            lastSeen: new Date()
-          });
-
-          io.emit("user-offline", {
-            userId,
-            lastSeen: new Date()
-          });
-
-          break;
+        if (!disconnectedUserId) {
+          for (let [userId, socketId] of onlineUsers.entries()) {
+            if (socketId === socket.id) {
+              disconnectedUserId = String(userId);
+              break;
+            }
+          }
         }
+
+        if (disconnectedUserId) {
+          onlineUsers.delete(disconnectedUserId);
+
+          const lastSeen = new Date();
+
+          await User.findByIdAndUpdate(disconnectedUserId, {
+            isOnline: false,
+            status: "offline",
+            socketId: null,
+            lastSeen: lastSeen
+          });
+
+          emitPresence(io, disconnectedUserId, false, lastSeen);
+        }
+
+        console.log("🔴 Disconnected:", socket.id);
+      } catch (err) {
+        console.error("Disconnect socket error:", err);
       }
-    } catch (err) {
-      console.error("Disconnect error:", err);
-    }
+    });
   });
 };
 
-module.exports = { handleChatSocket };
+module.exports = {
+  initSocket,
+  getSocketIdByUserId
+};
