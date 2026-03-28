@@ -176,37 +176,31 @@
         '<div id="vibeProfileEditorHeader">Edit Profile</div>' +
         '<div id="vibeProfileEditorBody">' +
           '<div id="vibeProfileEditorAvatarPreview">U</div>' +
-
           '<div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap;">' +
             '<label class="vibeProfileMiniBtn" for="vibeProfileAvatarFile">Choose Photo</label>' +
             '<input id="vibeProfileAvatarFile" type="file" accept="image/*" style="display:none;">' +
-          '</div>' +
-
+          "</div>" +
           '<div class="vibeProfileField">' +
             '<label for="vibeProfileAvatarUrl">Profile Picture URL (optional)</label>' +
             '<input id="vibeProfileAvatarUrl" type="text" placeholder="https://example.com/avatar.png">' +
-          '</div>' +
-
+          "</div>" +
           '<div class="vibeProfileField">' +
             '<label for="vibeProfileName">Name</label>' +
             '<input id="vibeProfileName" type="text" maxlength="60" placeholder="Your name">' +
-          '</div>' +
-
+          "</div>" +
           '<div class="vibeProfileField">' +
             '<label for="vibeProfileUsername">Username</label>' +
             '<input id="vibeProfileUsername" type="text" maxlength="30" placeholder="username">' +
-          '</div>' +
-
+          "</div>" +
           '<div class="vibeProfileField">' +
             '<label for="vibeProfileBio">Bio</label>' +
             '<textarea id="vibeProfileBio" maxlength="180" placeholder="Write something about yourself"></textarea>' +
-          '</div>' +
-        '</div>' +
-
+          "</div>" +
+        "</div>" +
         '<div id="vibeProfileEditorActions">' +
           '<button type="button" class="vibeProfileBtn vibeProfileBtnCancel" id="vibeProfileCancelBtn">Cancel</button>' +
           '<button type="button" class="vibeProfileBtn vibeProfileBtnSave" id="vibeProfileSaveBtn">Save Changes</button>' +
-        '</div>' +
+        "</div>" +
       "</div>";
 
     document.body.appendChild(overlay);
