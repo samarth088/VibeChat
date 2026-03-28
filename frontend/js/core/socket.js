@@ -1,52 +1,11 @@
-// js/core/socket.js
-// Socket.io client loader + normalized events
+// js/core/api.js
+// Production-ready API wrapper
+// Load order: env.js → state.js → api.js
 
 (function () {
-  var socket = null;
-  var scriptPromise = null;
-  var queuedRooms = [];
-  var isConnecting = false;
-  var currentHandler = function () {};
-
-  function getBaseUrl() {
-    var cfg = window.ENV || {};
-    var raw = cfg.WS_URL || cfg.API_URL || window.location.origin;
-    raw = String(raw || "").replace(/\/+$/, "");
-    raw = raw.replace(/\/api$/, "");
-    return raw;
-  }
-
-  function loadSocketClient() {
-    if (window.io) {
-      return Promise.resolve(window.io);
-    }
-
-    if (scriptPromise) {
-      return scriptPromise;
-    }
-
-    scriptPromise = new Promise(function (resolve, reject) {
-      var script = document.createElement("script");
-      script.src = getBaseUrl() + "/socket.io/socket.io.js";
-      script.async = true;
-
-      script.onload = function () {
-        if (window.io) {
-          resolve(window.io);
-        } else {
-          reject(new Error("socket.io client not available"));
-        }
-      };
-
-      script.onerror = function () {
-        reject(new Error("Failed to load socket.io client"));
-      };
-
-      document.head.appendChild(script);
-    });
-
-    return scriptPromise;
-  }
+  var cfg = window.ENV || {};
+  cfg.DEV_MODE = !!cfg.DEV_MODE;
+  if (!cfg.API_URL) cfg.API_URL = "";
 
   function getSession() {
     return window.VibeState && window.VibeState.loadSession
@@ -54,149 +13,210 @@
       : null;
   }
 
-  function emitToApp(payload) {
-    try {
-      if (typeof currentHandler === "function") {
-        currentHandler(payload);
-      }
-    } catch (err) {
-      console.error("VibeSocket callback error:", err);
-    }
+  function getToken(token) {
+    if (token) return token;
+    var sess = getSession();
+    return sess && sess.token ? sess.token : "";
   }
 
-  function bindEvents() {
-    if (!socket) return;
+  function fetchJSON(url, opts) {
+    return fetch(url, opts).then(async function (res) {
+      var data = {};
+      try { data = await res.json(); } catch (e) {}
 
-    socket.on("connect", function () {
-      var sess = getSession();
-      if (sess && sess.userId) {
-        socket.emit("register", sess.userId);
+      if (!res.ok) {
+        throw new Error(data.message || data.error || ("HTTP " + res.status));
       }
 
-      while (queuedRooms.length) {
-        socket.emit("join", queuedRooms.shift());
-      }
-    });
-
-    socket.on("message", function (data) {
-      emitToApp({
-        type: "message",
-        room: String(data.room || data.chat || data.chatId || ""),
-        _id: data._id || null,
-        sender: data.sender || null,
-        receiver: data.receiver || null,
-        text: data.text || data.content || "",
-        content: data.content || data.text || "",
-        status: data.status || "sent",
-        createdAt: data.createdAt || new Date().toISOString()
-      });
-    });
-
-    socket.on("seen", function (data) {
-      emitToApp({
-        type: "seen",
-        room: String(data.room || data.chatId || ""),
-        userId: data.userId || null
-      });
-    });
-
-    socket.on("presence", function (data) {
-      emitToApp({
-        type: "presence",
-        userId: String(data.userId || ""),
-        isOnline: !!data.isOnline,
-        lastSeen: data.lastSeen || null
-      });
-    });
-
-    // Compatibility
-    socket.on("user-online", function (userId) {
-      emitToApp({
-        type: "presence",
-        userId: String(userId || ""),
-        isOnline: true,
-        lastSeen: null
-      });
-    });
-
-    socket.on("user-offline", function (data) {
-      emitToApp({
-        type: "presence",
-        userId: String((data && data.userId) || ""),
-        isOnline: false,
-        lastSeen: data && data.lastSeen ? data.lastSeen : null
-      });
-    });
-
-    socket.on("message-seen", function (data) {
-      emitToApp({
-        type: "seen",
-        room: String((data && (data.room || data.chatId)) || "")
-      });
-    });
-
-    socket.on("disconnect", function () {
-      // silent
+      return data;
     });
   }
 
-  window.VibeSocket = {
-    connect: function (_token, onMessage) {
-      currentHandler = typeof onMessage === "function" ? onMessage : function () {};
-
-      if (socket && socket.connected) {
-        var sess = getSession();
-        if (sess && sess.userId) {
-          socket.emit("register", sess.userId);
-        }
-        return socket;
-      }
-
-      if (isConnecting) {
-        return null;
-      }
-
-      isConnecting = true;
-
-      loadSocketClient()
-        .then(function () {
-          socket = window.io(getBaseUrl(), {
-            transports: ["websocket", "polling"]
-          });
-
-          bindEvents();
+  window.VibeAPI = {
+    sendMessage: function (chatId, text, token) {
+      return fetchJSON(cfg.API_URL + "/messages", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": "Bearer " + getToken(token)
+        },
+        body: JSON.stringify({
+          chatId: chatId,
+          text: text
         })
-        .catch(function (err) {
-          console.warn("VibeSocket disabled:", err.message || err);
-        })
-        .finally(function () {
-          isConnecting = false;
+      });
+    },
+
+    login: function (data) {
+      var identifier = data.identifier;
+      var password = data.password;
+
+      if (cfg.DEV_MODE) {
+        return new Promise(function (resolve) {
+          setTimeout(function () {
+            var userId = Math.floor(Math.random() * 90000) + 1;
+            resolve({
+              token: "dev-token-" + userId,
+              user: {
+                id: userId,
+                uid: "vibe_demo_" + userId,
+                name: identifier,
+                username: identifier,
+                email: identifier + "@demo.local",
+                avatar: "",
+                bio: "🚀 Living on vibes."
+              }
+            });
+          }, 500);
         });
-
-      return null;
-    },
-
-    send: function (eventName, data) {
-      if (!socket || !socket.connected) return;
-      socket.emit(eventName, data);
-    },
-
-    joinRoom: function (roomId) {
-      if (!roomId) return;
-
-      var room = String(roomId);
-
-      if (socket && socket.connected) {
-        socket.emit("join", room);
-      } else if (queuedRooms.indexOf(room) === -1) {
-        queuedRooms.push(room);
       }
+
+      return fetchJSON(cfg.API_URL + "/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: identifier,
+          password: password
+        })
+      });
     },
 
-    disconnect: function () {
-      if (!socket) return;
-      socket.disconnect();
-      socket = null;
+    sendOTP: function (email) {
+      if (!email) {
+        return Promise.reject(new Error("Email is required"));
+      }
+
+      return fetchJSON(cfg.API_URL + "/auth/send-otp", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: email })
+      });
+    },
+
+    verifyOTPAndSignup: function (data) {
+      return fetchJSON(cfg.API_URL + "/auth/verify-otp", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: data.email,
+          otp: data.otp
+        })
+      }).then(function () {
+        return fetchJSON(cfg.API_URL + "/auth/signup", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            name: data.fullname,
+            email: data.email,
+            password: data.password
+          })
+        });
+      });
+    },
+
+    searchUsers: function (query) {
+      if (!query) return Promise.resolve([]);
+
+      var q = String(query).trim();
+
+      return fetchJSON(cfg.API_URL + "/users/search?uid=" + encodeURIComponent(q), {
+        headers: {
+          "Authorization": "Bearer " + getToken()
+        }
+      }).then(function (res) {
+        if (!res.success || !res.user) return [];
+
+        return [{
+          userId: res.user.id,
+          uid: res.user.uid,
+          name: res.user.name || "",
+          username: res.user.username || res.user.name,
+          avatar: res.user.avatar || "",
+          bio: res.user.bio || "",
+          isOnline: !!res.user.isOnline,
+          lastSeen: res.user.lastSeen || null
+        }];
+      });
+    },
+
+    getUserById: function (userId) {
+      return fetchJSON(cfg.API_URL + "/users/search?uid=" + encodeURIComponent(userId), {
+        headers: {
+          "Authorization": "Bearer " + getToken()
+        }
+      }).then(function (res) {
+        if (!res.success || !res.user) {
+          throw new Error("User not found");
+        }
+
+        return {
+          userId: res.user.id,
+          uid: res.user.uid,
+          username: res.user.username,
+          name: res.user.name,
+          bio: res.user.bio || "",
+          avatar: res.user.avatar || "",
+          isOnline: !!res.user.isOnline,
+          lastSeen: res.user.lastSeen || null
+        };
+      });
+    },
+
+    // ADDED
+    getMyProfile: function (token) {
+      return fetchJSON(cfg.API_URL + "/users/me", {
+        headers: {
+          "Authorization": "Bearer " + getToken(token)
+        }
+      }).then(function (res) {
+        if (!res.success || !res.user) {
+          throw new Error("Failed to load profile");
+        }
+        return res.user;
+      });
+    },
+
+    // ADDED
+    updateProfile: function (data, token) {
+      return fetchJSON(cfg.API_URL + "/users/me", {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": "Bearer " + getToken(token)
+        },
+        body: JSON.stringify(data || {})
+      }).then(function (res) {
+        if (!res.success || !res.user) {
+          throw new Error("Profile update failed");
+        }
+        return res.user;
+      });
+    },
+
+    // ADDED
+    updateAvatar: function (avatar, token) {
+      return this.updateProfile({ avatar: avatar }, token);
+    },
+
+    openChatWith: function (userId, token) {
+      return fetchJSON(cfg.API_URL + "/chats", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": "Bearer " + getToken(token)
+        },
+        body: JSON.stringify({
+          otherUserId: userId
+        })
+      }).then(function (res) {
+        if (!res.roomId) {
+          throw new Error("Chat creation failed");
+        }
+
+        return {
+          roomId: res.roomId
+        };
+      });
     }
   };
 })();
