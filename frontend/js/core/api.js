@@ -1,222 +1,112 @@
 // js/core/api.js
-// Production-ready API wrapper
-// Load order: env.js → state.js → api.js
+// VibeChat — centralized REST API calls
+// All functions return parsed JSON or throw an Error with .message
 
 (function () {
-  var cfg = window.ENV || {};
-  cfg.DEV_MODE = !!cfg.DEV_MODE;
-  if (!cfg.API_URL) cfg.API_URL = "";
 
-  function getSession() {
-    return window.VibeState && window.VibeState.loadSession
-      ? window.VibeState.loadSession()
-      : null;
+  function getBase() {
+    var cfg = window.ENV || {};
+    return String(cfg.API_URL || "").replace(/\/+$/, "");
   }
 
-  function getToken(token) {
-    if (token) return token;
-    var sess = getSession();
-    return sess && sess.token ? sess.token : "";
-  }
+  async function request(method, path, body, token) {
+    var url = getBase() + path;
 
-  function fetchJSON(url, opts) {
-    return fetch(url, opts).then(async function (res) {
-      var data = {};
-      try { data = await res.json(); } catch (e) {}
+    var headers = { "Content-Type": "application/json" };
+    if (token) headers["Authorization"] = "Bearer " + token;
 
-      if (!res.ok) {
-        throw new Error(data.message || data.error || ("HTTP " + res.status));
-      }
+    var opts = { method: method, headers: headers };
+    if (body !== undefined && body !== null) {
+      opts.body = JSON.stringify(body);
+    }
 
-      return data;
-    });
+    var res  = await fetch(url, opts);
+    var data = await res.json().catch(function () { return {}; });
+
+    if (!res.ok) {
+      var msg = data.message || data.error || ("Request failed: " + res.status);
+      throw new Error(msg);
+    }
+
+    return data;
   }
 
   window.VibeAPI = {
-    sendMessage: function (chatId, text, token) {
-      return fetchJSON(cfg.API_URL + "/messages", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": "Bearer " + getToken(token)
-        },
-        body: JSON.stringify({
-          chatId: chatId,
-          text: text
-        })
-      });
+
+    /* ─── Auth ─── */
+
+    login: async function (payload) {
+      // payload: { identifier, password }
+      return request("POST", "/auth/login", payload);
     },
 
-    login: function (data) {
-      var identifier = data.identifier;
-      var password = data.password;
-
-      if (cfg.DEV_MODE) {
-        return new Promise(function (resolve) {
-          setTimeout(function () {
-            var userId = Math.floor(Math.random() * 90000) + 1;
-            resolve({
-              token: "dev-token-" + userId,
-              user: {
-                id: userId,
-                uid: "vibe_demo_" + userId,
-                name: identifier,
-                username: identifier,
-                email: identifier + "@demo.local",
-                avatar: "",
-                bio: "🚀 Living on vibes."
-              }
-            });
-          }, 500);
-        });
-      }
-
-      return fetchJSON(cfg.API_URL + "/auth/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          email: identifier,
-          password: password
-        })
-      });
+    signup: async function (payload) {
+      return request("POST", "/auth/register", payload);
     },
 
-    sendOTP: function (email) {
-      if (!email) {
-        return Promise.reject(new Error("Email is required"));
-      }
+    /* ─── Profile ─── */
 
-      return fetchJSON(cfg.API_URL + "/auth/send-otp", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: email })
-      });
+    // GET /users/me — returns current user object
+    getMyProfile: async function (token) {
+      var data = await request("GET", "/users/me", null, token);
+      // backend may return { user: {...} } or the object directly
+      return data.user || data;
     },
 
-    verifyOTPAndSignup: function (data) {
-      return fetchJSON(cfg.API_URL + "/auth/verify-otp", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          email: data.email,
-          otp: data.otp
-        })
-      }).then(function () {
-        return fetchJSON(cfg.API_URL + "/auth/signup", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            name: data.fullname,
-            email: data.email,
-            password: data.password
-          })
-        });
-      });
+    // PATCH /users/me — update name, username, bio, avatar
+    updateProfile: async function (payload, token) {
+      var data = await request("PATCH", "/users/me", payload, token);
+      return data.user || data;
     },
 
-    searchUsers: function (query) {
-      if (!query) return Promise.resolve([]);
+    /* ─── User search ─── */
 
-      var q = String(query).trim();
-
-      return fetchJSON(cfg.API_URL + "/users/search?uid=" + encodeURIComponent(q), {
-        headers: {
-          "Authorization": "Bearer " + getToken()
-        }
-      }).then(function (res) {
-        if (!res.success || !res.user) return [];
-
-        return [{
-          userId: res.user.id,
-          uid: res.user.uid,
-          name: res.user.name || "",
-          username: res.user.username || res.user.name,
-          avatar: res.user.avatar || "",
-          bio: res.user.bio || "",
-          isOnline: !!res.user.isOnline,
-          lastSeen: res.user.lastSeen || null
-        }];
-      });
+    searchUsers: async function (query, token) {
+      var encoded = encodeURIComponent(query);
+      var data = await request("GET", "/users/search?q=" + encoded, null, token);
+      return data.users || data.results || data || [];
     },
 
-    getUserById: function (userId) {
-      return fetchJSON(cfg.API_URL + "/users/search?uid=" + encodeURIComponent(userId), {
-        headers: {
-          "Authorization": "Bearer " + getToken()
-        }
-      }).then(function (res) {
-        if (!res.success || !res.user) {
-          throw new Error("User not found");
-        }
-
-        return {
-          userId: res.user.id,
-          uid: res.user.uid,
-          username: res.user.username,
-          name: res.user.name,
-          bio: res.user.bio || "",
-          avatar: res.user.avatar || "",
-          isOnline: !!res.user.isOnline,
-          lastSeen: res.user.lastSeen || null
-        };
-      });
+    getUserById: async function (userId, token) {
+      var data = await request("GET", "/users/" + userId, null, token);
+      return data.user || data;
     },
 
-    // ADDED
-    getMyProfile: function (token) {
-      return fetchJSON(cfg.API_URL + "/users/me", {
-        headers: {
-          "Authorization": "Bearer " + getToken(token)
-        }
-      }).then(function (res) {
-        if (!res.success || !res.user) {
-          throw new Error("Failed to load profile");
-        }
-        return res.user;
-      });
+    /* ─── Chats ─── */
+
+    getChats: async function (token) {
+      var data = await request("GET", "/chats", null, token);
+      return data.chats || data.data || [];
     },
 
-    // ADDED
-    updateProfile: function (data, token) {
-      return fetchJSON(cfg.API_URL + "/users/me", {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": "Bearer " + getToken(token)
-        },
-        body: JSON.stringify(data || {})
-      }).then(function (res) {
-        if (!res.success || !res.user) {
-          throw new Error("Profile update failed");
-        }
-        return res.user;
-      });
+    openOrCreateChat: async function (userId, token) {
+      return request("POST", "/chats", { userId: userId }, token);
     },
 
-    // ADDED
-    updateAvatar: function (avatar, token) {
-      return this.updateProfile({ avatar: avatar }, token);
+    getMessages: async function (roomId, token) {
+      var data = await request("GET", "/chats/" + roomId + "/messages", null, token);
+      return data.messages || data || [];
     },
 
-    openChatWith: function (userId, token) {
-      return fetchJSON(cfg.API_URL + "/chats", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": "Bearer " + getToken(token)
-        },
-        body: JSON.stringify({
-          otherUserId: userId
-        })
-      }).then(function (res) {
-        if (!res.roomId) {
-          throw new Error("Chat creation failed");
-        }
+    sendMessage: async function (roomId, content, token) {
+      return request("POST", "/chats/" + roomId + "/messages", { content: content }, token);
+    },
 
-        return {
-          roomId: res.roomId
-        };
-      });
+    markSeen: async function (roomId, token) {
+      return request("PATCH", "/chats/" + roomId + "/seen", null, token).catch(function () {});
+    },
+
+    /* ─── Groups ─── */
+
+    getGroups: async function (token) {
+      var data = await request("GET", "/groups", null, token);
+      return data.groups || data || [];
+    },
+
+    createGroup: async function (payload, token) {
+      return request("POST", "/groups", payload, token);
     }
+
   };
+
 })();
