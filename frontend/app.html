@@ -14,8 +14,9 @@
 
 <div class="phone">
 
+  <!-- Status Bar -->
   <div class="status-bar">
-    <span>9:30</span>
+    <span id="statusClock">9:30</span>
     <div class="status-icons">
       <svg viewBox="0 0 24 24"><rect x="2" y="10" width="3" height="11" rx="1"/><rect x="7" y="7" width="3" height="14" rx="1"/><rect x="12" y="4" width="3" height="17" rx="1"/><rect x="17" y="1" width="3" height="20" rx="1"/></svg>
       <svg viewBox="0 0 24 24"><path d="M1 7c0 0 5.5-6 11-6s11 6 11 6L12 22 1 7z"/></svg>
@@ -23,6 +24,7 @@
     </div>
   </div>
 
+  <!-- Header -->
   <div class="header">
     <button class="header-btn" onclick="openProfile()" aria-label="Open profile">
       <svg viewBox="0 0 24 24" width="22" height="22" fill="rgba(255,255,255,0.7)">
@@ -47,10 +49,12 @@
     </div>
   </div>
 
+  <!-- Brand Logo -->
   <div class="brand-logo">
     <img src="assets/images/logo.png" alt="logo" height="40"/>
   </div>
 
+  <!-- Search Bar -->
   <div class="search-bar-wrap">
     <div class="search-bar">
       <svg viewBox="0 0 24 24">
@@ -61,21 +65,25 @@
     </div>
   </div>
 
+  <!-- DM Content -->
   <div id="dmContent"></div>
 
+  <!-- Group Content -->
   <div class="group-content" id="groupContent">
     <div class="group-icon-big">👥</div>
     <div class="group-title">Create Your Group</div>
-    <div class="group-sub">Start a group with friends, family, or teammates. Unlimited members, real vibes.</div>
+    <div class="group-sub">Start a group with friends, family, or teammates.</div>
     <button class="btn-create-group">+ Create Group</button>
   </div>
 
+  <!-- Calls Content -->
   <div class="calls-content" id="callsContent">
     <div class="group-icon-big">📞</div>
     <div class="group-title">No Recent Calls</div>
-    <div class="group-sub">Your call history will appear here. Start a call from any chat.</div>
+    <div class="group-sub">Your call history will appear here.</div>
   </div>
 
+  <!-- Nav Glow + Bottom Nav -->
   <div class="nav-glow"></div>
   <div class="bottom-nav">
     <div class="nav-tab active" id="tab-dm" onclick="switchTab('dm')">
@@ -92,14 +100,16 @@
     </div>
   </div>
 
+  <!-- ═══════════════ SHEETS ═══════════════ -->
+
+  <!-- Search Sheet -->
   <div class="sheet-overlay" id="searchSheet" onclick="closeSheet(event,'searchSheet')">
     <div class="sheet" onclick="event.stopPropagation()">
       <div class="sheet-handle"></div>
       <div class="sheet-title">Find &amp; Add Users</div>
       <div class="sheet-input">
         <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="rgba(100,180,255,0.6)" stroke-width="2" stroke-linecap="round">
-          <circle cx="11" cy="11" r="7"/>
-          <line x1="16.5" y1="16.5" x2="22" y2="22"/>
+          <circle cx="11" cy="11" r="7"/><line x1="16.5" y1="16.5" x2="22" y2="22"/>
         </svg>
         <input type="text" id="searchInput" placeholder="Enter ID or username…" oninput="handleSearch(this.value)" />
       </div>
@@ -109,6 +119,7 @@
     </div>
   </div>
 
+  <!-- Settings Sheet -->
   <div class="sheet-overlay" id="settingsSheet" onclick="closeSheet(event,'settingsSheet')">
     <div class="sheet" onclick="event.stopPropagation()">
       <div class="sheet-handle"></div>
@@ -116,27 +127,38 @@
 
       <div class="settings-section">
         <div class="settings-label">Account</div>
-        <div class="settings-item" id="settingsEditProfileBtn"><span class="settings-icon">👤</span> Edit Profile<span class="settings-item-arrow">›</span></div>
-        <div class="settings-item"><span class="settings-icon">🔒</span> Privacy<span class="settings-item-arrow">›</span></div>
-        <div class="settings-item"><span class="settings-icon">🔔</span> Notifications<span class="settings-item-arrow">›</span></div>
+        <!-- FIX: onclick calls window.VibeProfile.openEditor() directly -->
+        <div class="settings-item" onclick="closeSheet(event,'settingsSheet'); setTimeout(function(){ window.VibeProfile && window.VibeProfile.openEditor(); }, 200);">
+          <span class="settings-icon">👤</span> Edit Profile<span class="settings-item-arrow">›</span>
+        </div>
+        <div class="settings-item">
+          <span class="settings-icon">🔒</span> Privacy<span class="settings-item-arrow">›</span>
+        </div>
+        <div class="settings-item">
+          <span class="settings-icon">🔔</span> Notifications<span class="settings-item-arrow">›</span>
+        </div>
       </div>
 
       <div class="settings-section">
         <div class="settings-label">Preferences</div>
-        <label class="settings-item" for="darkModeToggle">
-          <span><span class="settings-icon">🌙</span> Dark Mode</span>
-          <input id="darkModeToggle" type="checkbox" />
-        </label>
-        <label class="settings-item" for="soundToggle">
-          <span><span class="settings-icon">🔊</span> Sound</span>
-          <input id="soundToggle" type="checkbox" />
-        </label>
-        <div class="settings-item" id="settingsLanguageBtn"><span class="settings-icon">🌐</span> Language<span class="settings-item-arrow">›</span></div>
+        <div class="settings-item">
+          <span class="settings-icon">🌙</span> Dark Mode
+          <div class="toggle on" id="darkModeToggle" onclick="this.classList.toggle('on')"></div>
+        </div>
+        <div class="settings-item">
+          <span class="settings-icon">🔊</span> Sound
+          <div class="toggle on" id="soundToggle" onclick="this.classList.toggle('on')"></div>
+        </div>
+        <div class="settings-item">
+          <span class="settings-icon">🌐</span> Language<span class="settings-item-arrow">›</span>
+        </div>
       </div>
 
       <div class="settings-section">
         <div class="settings-label">Support</div>
-        <div class="settings-item"><span class="settings-icon">❓</span> Help &amp; FAQ<span class="settings-item-arrow">›</span></div>
+        <div class="settings-item">
+          <span class="settings-icon">❓</span> Help &amp; FAQ<span class="settings-item-arrow">›</span>
+        </div>
         <div class="settings-item" style="color:#ff5060;" onclick="handleSignOut()">
           <span class="settings-icon">🚪</span> Sign Out
         </div>
@@ -144,27 +166,42 @@
     </div>
   </div>
 
+  <!-- Profile Sheet -->
   <div class="sheet-overlay" id="profileSheet" onclick="closeSheet(event,'profileSheet')">
     <div class="sheet" onclick="event.stopPropagation()">
       <div class="sheet-handle"></div>
+
+      <!-- Avatar — clicking it also opens editor -->
       <div class="profile-header">
-        <div class="profile-avatar-big">Y</div>
-        <div class="profile-name">Your Name</div>
-        <div class="profile-uid">@username · ID: #00001</div>
+        <div class="profile-avatar-big" id="profileAvatar"
+             onclick="closeSheet(event,'profileSheet'); setTimeout(function(){ window.VibeProfile && window.VibeProfile.openEditor(); }, 200);"
+             style="cursor:pointer;" title="Edit photo">
+          Y
+        </div>
+        <div class="profile-name" id="profileName">Your Name</div>
+        <div class="profile-uid"  id="profileUid">@username · ID: #00001</div>
       </div>
-      <div class="profile-bio">🚀 Living on vibes. Connect with me on VibeChat!</div>
+
+      <div class="profile-bio" id="profileBio">🚀 Living on vibes. Connect with me on VibeChat!</div>
+
       <div class="profile-stat">
-        <div class="stat-box"><div class="stat-num">5</div><div class="stat-label">Chats</div></div>
-        <div class="stat-box"><div class="stat-num">0</div><div class="stat-label">Groups</div></div>
+        <div class="stat-box"><div class="stat-num" id="statChats">—</div><div class="stat-label">Chats</div></div>
+        <div class="stat-box"><div class="stat-num" id="statGroups">0</div><div class="stat-label">Groups</div></div>
         <div class="stat-box"><div class="stat-num">🟢</div><div class="stat-label">Online</div></div>
       </div>
-      <button class="btn-outline" id="profileEditBtn" style="margin-bottom:10px;">✏️ Edit Profile</button>
-      <button class="btn-primary">Share My ID</button>
+
+      <!-- FIX: explicit onclick → VibeProfile.openEditor() — NOT relying on text-scan -->
+      <button class="btn-outline" style="margin-bottom:10px;"
+              onclick="closeSheet(event,'profileSheet'); setTimeout(function(){ window.VibeProfile && window.VibeProfile.openEditor(); }, 200);">
+        ✏️ Edit Profile
+      </button>
+      <button class="btn-primary" onclick="shareMyId()">Share My ID</button>
     </div>
   </div>
 
-</div>
+</div><!-- /.phone -->
 
+<!-- ── Scripts (load order matters) ── -->
 <script src="config/env.js"></script>
 <script src="js/core/state.js"></script>
 <script src="js/core/api.js"></script>
@@ -175,30 +212,43 @@
 <script src="js/ui/header.js"></script>
 <script src="js/ui/overlays.js"></script>
 <script src="js/ui/bottomNav.js"></script>
-<script src="js/ui/profile.js"></script>
-<script src="js/pages/settings.js"></script>
+<script src="js/pages/profile.js"></script>
 <script src="js/pages/chat.js"></script>
 <script src="js/pages/group.js"></script>
 <script src="js/pages/calls.js"></script>
 <script>
-  initHeader();
-
-  function handleSignOut() {
-    if (window.VibeSocket && window.VibeSocket.disconnect) {
-      window.VibeSocket.disconnect();
+  /* ── Clock ── */
+  (function tickClock() {
+    var el = document.getElementById("statusClock");
+    if (el) {
+      var now = new Date();
+      el.textContent = now.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
     }
+    setTimeout(tickClock, 10000);
+  })();
+
+  /* ── Init header (clock is now inline above) ── */
+  if (typeof initHeader === "function") initHeader();
+
+  /* ── Sign out ── */
+  function handleSignOut() {
     if (window.VibeState) window.VibeState.clearSession();
-    window.location.replace("./index.html");
+    window.location.replace('./index.html');
   }
 
-  document.addEventListener("DOMContentLoaded", function () {
-    var btn = document.getElementById("profileEditBtn");
-    if (btn) {
-      btn.addEventListener("click", function () {
-        document.dispatchEvent(new CustomEvent("vibe:open-profile-editor"));
+  /* ── Share My ID ── */
+  function shareMyId() {
+    var sess = window.VibeState && window.VibeState.loadSession ? window.VibeState.loadSession() : null;
+    if (!sess) return;
+    var text = "Chat with me on VibeChat! My ID: " + (sess.uid || sess.userId || "");
+    if (navigator.share) {
+      navigator.share({ title: "VibeChat", text: text }).catch(function(){});
+    } else if (navigator.clipboard) {
+      navigator.clipboard.writeText(text).then(function() {
+        if (window.showToast) window.showToast("ID copied to clipboard!");
       });
     }
-  });
+  }
 </script>
 
 </body>
