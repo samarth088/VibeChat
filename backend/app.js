@@ -1,45 +1,68 @@
-require("./config/env");
+// ================================
+// VibeChat Express App Config
+// ================================
 
-const http = require("http");
-const app = require("./app");
-const { connectDB } = require("./config/db");
-const { Server } = require("socket.io");
-const { initSocket } = require("./socket/socket");
+const express = require("express");
+const cors = require("cors");
 
-const PORT = process.env.PORT || 10000;
+const authRoutes    = require("./routes/auth.routes");
+const userRoutes    = require("./routes/user.routes");
+const chatRoutes    = require("./routes/chat.routes");
+const groupRoutes   = require("./routes/group.routes");
 
-async function startServer() {
-  try {
-    console.log("🚀 Starting backend...");
+const errorMiddleware = require("./middleware/error.middleware");
 
-    await connectDB();
+const app = express();
 
-    const server = http.createServer(app);
+// ================= CORS =================
+// FIX: OPTIONS preflight must be handled BEFORE all routes
+// Browser sends OPTIONS before PATCH/PUT/DELETE — without this,
+// CORS policy blocks the actual request.
 
-    const io = new Server(server, {
-      cors: {
-        origin: "*",
-        methods: ["GET", "POST", "PUT", "PATCH", "DELETE"]
-      }
-    });
+const corsOptions = {
+  origin: "*",
+  methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+  allowedHeaders: [
+    "Content-Type",
+    "Authorization",
+    "X-Requested-With",
+    "Accept",
+    "Origin"
+  ],
+  credentials: false   // must be false when origin is "*"
+};
 
-    // ADDED
-    app.set("io", io);
+// Handle preflight for ALL routes
+app.options("*", cors(corsOptions));
 
-    initSocket(io);
+// Apply CORS to all requests
+app.use(cors(corsOptions));
 
-    server.listen(PORT, "0.0.0.0", function () {
-      console.log("✅ Server running on port " + PORT);
-    });
+// ================= BODY PARSERS =================
+app.use(express.json({ limit: "15mb" }));
+app.use(express.urlencoded({ extended: true, limit: "15mb" }));
 
-    server.on("error", function (err) {
-      console.error("❌ Server listen error:", err);
-      process.exit(1);
-    });
-  } catch (err) {
-    console.error("❌ Fatal startup error:", err);
-    process.exit(1);
-  }
-}
+// ================= HEALTH CHECK =================
+app.get("/", (req, res) => {
+  res.status(200).json({
+    status: "success",
+    message: "🚀 VibeChat Backend Running"
+  });
+});
 
-startServer();
+// ================= API ROUTES =================
+app.use("/api/auth",     authRoutes);
+app.use("/api/users",    userRoutes);
+app.use("/api/chats",    chatRoutes);
+app.use("/api/groups",   groupRoutes);
+app.use("/api/messages", require("./routes/message.routes"));
+
+// ================= 404 =================
+app.use((req, res) => {
+  res.status(404).json({ error: "Route not found" });
+});
+
+// ================= ERROR HANDLER =================
+app.use(errorMiddleware);
+
+module.exports = app;
