@@ -1,46 +1,108 @@
-const express = require("express");
-const cors = require("cors");
+const mongoose = require("mongoose");
+const crypto = require("crypto");
 
-const authRoutes = require("./routes/auth.routes");
-const userRoutes = require("./routes/user.routes");
-const chatRoutes = require("./routes/chat.routes");
-const groupRoutes = require("./routes/group.routes");
-const messageRoutes = require("./routes/message.routes");
+function generateUID() {
+  return "vibe_" + crypto.randomBytes(3).toString("hex");
+}
 
-const errorMiddleware = require("./middleware/error.middleware");
+const userSchema = new mongoose.Schema(
+  {
+    uid: {
+      type: String,
+      unique: true,
+      index: true,
+      default: generateUID
+    },
 
-const app = express();
+    // ADDED
+    name: {
+      type: String,
+      required: true,
+      trim: true
+    },
 
-app.use(cors({
-  origin: "*",
-  methods: ["GET", "POST", "PUT", "PATCH", "DELETE"],
-  credentials: true
-}));
+    // ADDED
+    username: {
+      type: String,
+      unique: true,
+      sparse: true,
+      lowercase: true,
+      trim: true,
+      index: true,
+      default: null
+    },
 
-// UPDATED
-app.use(express.json({ limit: "15mb" }));
-app.use(express.urlencoded({ extended: true, limit: "15mb" }));
+    email: {
+      type: String,
+      required: true,
+      unique: true,
+      lowercase: true,
+      trim: true
+    },
 
-app.get("/", function (req, res) {
-  res.status(200).json({
-    status: "success",
-    message: "🚀 VibeChat Backend Running"
-  });
-});
+    password: {
+      type: String,
+      required: true,
+      minlength: 6
+    },
 
-app.use("/api/auth", authRoutes);
-app.use("/api/users", userRoutes);
-app.use("/api/chats", chatRoutes);
-app.use("/api/groups", groupRoutes);
-app.use("/api/messages", messageRoutes);
+    // ADDED
+    avatar: {
+      type: String,
+      default: ""
+    },
 
-app.use(function (req, res) {
-  res.status(404).json({
-    success: false,
-    message: "Route not found"
-  });
-});
+    // ADDED
+    bio: {
+      type: String,
+      default: ""
+    },
 
-app.use(errorMiddleware);
+    isVerified: {
+      type: Boolean,
+      default: false
+    },
 
-module.exports = app;
+    status: {
+      type: String,
+      enum: ["online", "offline", "away"],
+      default: "offline"
+    },
+
+    // ADDED
+    isOnline: {
+      type: Boolean,
+      default: false
+    },
+
+    // ADDED
+    socketId: {
+      type: String,
+      default: null
+    },
+
+    // ADDED
+    lastSeen: {
+      type: Date,
+      default: null
+    }
+  },
+  { timestamps: true }
+);
+
+userSchema.pre("validate", function (next) {
+  if (!this.uid) {
+    this.uid = generateUID();
+  }
+
+  if (this.username) {
+    this.username = String(this.username).trim().toLowerCase();
+  }
+
+  if (this.avatar == null) {
+    this.avatar = "";
+  }
+
+  if (this.bio == null) {
+    this.bio = "";
+  }
