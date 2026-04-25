@@ -1,52 +1,39 @@
-const mongoose = require("mongoose");
+const User = require("../models/User");
 
-const messageSchema = new mongoose.Schema(
-  {
-    chat: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "Chat",
-      required: true,
-      index: true
-    },
+// GET ALL USERS (except current user)
+exports.getAllUsers = async (req, res, next) => {
+  try {
+    const users = await User.find({ _id: { $ne: req.user._id } })
+      .select("-password");
+    res.json({ success: true, users });
+  } catch (err) { next(err); }
+};
 
-    sender: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "User",
-      required: true
-    },
+// GET MY PROFILE
+exports.getProfile = async (req, res, next) => {
+  try {
+    const user = await User.findById(req.user._id).select("-password");
+    res.json({ success: true, user });
+  } catch (err) { next(err); }
+};
 
-    receiver: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "User",
-      required: true
-    },
+// UPDATE MY PROFILE
+exports.updateProfile = async (req, res, next) => {
+  try {
+    const updates = (({ name, username, bio, avatar }) => ({ name, username, bio, avatar }))(req.body);
+    const user = await User.findByIdAndUpdate(req.user._id, updates, { new: true }).select("-password");
+    res.json({ success: true, user });
+  } catch (err) { next(err); }
+};
 
-    content: {
-      type: String,
-      required: true,
-      trim: true
-    },
-
-    status: {
-      type: String,
-      enum: ["sent", "delivered", "seen"],
-      default: "sent"
-    },
-
-    deliveredAt: {
-      type: Date,
-      default: null
-    },
-
-    seenAt: {
-      type: Date,
-      default: null
-    }
-  },
-  { timestamps: true }
-);
-
-messageSchema.index({ chat: 1, createdAt: 1 });
-
-// UPDATED
-module.exports = mongoose.models.Message || mongoose.model("Message", messageSchema);
+// SEARCH USER
+exports.searchUser = async (req, res, next) => {
+  try {
+    const { q } = req.query;
+    const users = await User.find({
+      $or: [{ username: new RegExp(q, "i") }, { uid: q }],
+      _id: { $ne: req.user._id }
+    }).select("-password");
+    res.json({ success: true, users });
+  } catch (err) { next(err); }
+};
