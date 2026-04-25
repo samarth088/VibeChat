@@ -106,3 +106,7 @@ userSchema.pre("validate", function (next) {
   if (this.bio == null) {
     this.bio = "";
   }
+next();
+});
+
+module.exports = mongoose.model("User", userSchema);
