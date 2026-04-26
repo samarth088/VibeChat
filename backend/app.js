@@ -14,13 +14,23 @@ const errorMiddleware = require("./middleware/error.middleware");
 
 const app = express();
 
-// ================= CORS =================
-// FIX: OPTIONS preflight must be handled BEFORE all routes
-// Browser sends OPTIONS before PATCH/PUT/DELETE — without this,
-// CORS policy blocks the actual request.
+// ================= CORS (PRODUCTION READY) =================
+const allowedOrigins = [
+  "https://vibechat.in",
+  "https://www.vibechat.in"
+];
 
 const corsOptions = {
-  origin: "*",
+  origin: function (origin, callback) {
+    // allow requests with no origin (mobile apps, Postman, curl)
+    if (!origin) return callback(null, true);
+
+    if (allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    } else {
+      return callback(new Error("CORS not allowed"), false);
+    }
+  },
   methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
   allowedHeaders: [
     "Content-Type",
@@ -29,13 +39,13 @@ const corsOptions = {
     "Accept",
     "Origin"
   ],
-  credentials: false   // must be false when origin is "*"
+  credentials: true
 };
 
-// Handle preflight for ALL routes
+// Handle preflight requests
 app.options("*", cors(corsOptions));
 
-// Apply CORS to all requests
+// Apply CORS
 app.use(cors(corsOptions));
 
 // ================= BODY PARSERS =================
