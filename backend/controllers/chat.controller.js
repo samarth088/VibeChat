@@ -1,208 +1,228 @@
-const User = require("../models/User");
+const Chat = require("../models/Chat");
+const Message = require("../models/Message");
 
-function isValidAvatar(value) {
-  if (!value) return true;
-
-  return (
-    /^https?:\/\//i.test(value) ||
-    /^data:image\/[a-zA-Z+]+;base64,/.test(value) ||
-    value.startsWith("/")
-  );
+// utils
+function sameId(a, b) {
+  return String(a) === String(b);
 }
 
-function sanitizeString(value) {
-  return String(value || "").trim();
+function mapGet(mapObj, key) {
+  if (!mapObj) return 0;
+  if (typeof mapObj.get === "function") {
+    return Number(mapObj.get(String(key)) || 0);
+  }
+  return Number(mapObj[String(key)] || 0);
 }
 
-// GET ALL USERS
-exports.getAllUsers = async (req, res, next) => {
-  try {
-    const users = await User.find(
-      { _id: { $ne: req.user._id } },
-      "username name bio avatar uid status isOnline lastSeen"
-    ).sort({ name: 1, username: 1 });
-
-    res.json({
-      success: true,
-      users
-    });
-  } catch (err) {
-    next(err);
+function mapSet(chatDoc, key, value) {
+  if (!chatDoc.unreadCounts) {
+    chatDoc.unreadCounts = {};
   }
-};
-
-// GET MY PROFILE
-exports.getProfile = async (req, res, next) => {
-  try {
-    const user = await User.findById(req.user._id).select("-password");
-
-    if (!user) {
-      return res.status(404).json({
-        success: false,
-        message: "User not found"
-      });
-    }
-
-    res.json({
-      success: true,
-      user
-    });
-  } catch (err) {
-    next(err);
+  if (typeof chatDoc.unreadCounts.set === "function") {
+    chatDoc.unreadCounts.set(String(key), Number(value || 0));
+  } else {
+    chatDoc.unreadCounts[String(key)] = Number(value || 0);
   }
-};
+}
 
-// UPDATE PROFILE
-exports.updateProfile = async (req, res, next) => {
+// ✅ CREATE OR GET CHAT
+exports.createOrGetChat = async (req, res, next) => {
   try {
-    const updates = {};
-    const body = req.body || {};
+    const currentUserId = req.user._id;
+    const otherUserId = req.body.userId;
 
-    // UPDATED
-    if (Object.prototype.hasOwnProperty.call(body, "name")) {
-      const name = sanitizeString(body.name);
-
-      if (!name) {
-        return res.status(400).json({
-          success: false,
-          message: "Name is required"
-        });
-      }
-
-      if (name.length > 60) {
-        return res.status(400).json({
-          success: false,
-          message: "Name is too long"
-        });
-      }
-
-      updates.name = name;
-    }
-
-    // UPDATED
-    if (Object.prototype.hasOwnProperty.call(body, "username")) {
-      const username = sanitizeString(body.username).toLowerCase();
-
-      if (!username) {
-        return res.status(400).json({
-          success: false,
-          message: "Username is required"
-        });
-      }
-
-      if (!/^[a-z0-9_.]{3,30}$/.test(username)) {
-        return res.status(400).json({
-          success: false,
-          message: "Username must be 3-30 chars and only letters, numbers, _ or ."
-        });
-      }
-
-      const existing = await User.findOne({
-        username,
-        _id: { $ne: req.user._id }
-      });
-
-      if (existing) {
-        return res.status(400).json({
-          success: false,
-          message: "Username already taken"
-        });
-      }
-
-      updates.username = username;
-    }
-
-    // UPDATED
-    if (Object.prototype.hasOwnProperty.call(body, "bio")) {
-      const bio = String(body.bio || "").trim();
-
-      if (bio.length > 180) {
-        return res.status(400).json({
-          success: false,
-          message: "Bio is too long"
-        });
-      }
-
-      updates.bio = bio;
-    }
-
-    // UPDATED
-    if (Object.prototype.hasOwnProperty.call(body, "avatar")) {
-      const avatar = String(body.avatar || "").trim();
-
-      if (!isValidAvatar(avatar)) {
-        return res.status(400).json({
-          success: false,
-          message: "Avatar must be a valid image URL or base64 image"
-        });
-      }
-
-      updates.avatar = avatar;
-    }
-
-    const user = await User.findByIdAndUpdate(
-      req.user._id,
-      updates,
-      { new: true, runValidators: true }
-    ).select("-password");
-
-    res.json({
-      success: true,
-      user
-    });
-  } catch (err) {
-    if (err && err.code === 11000) {
+    if (!otherUserId) {
       return res.status(400).json({
         success: false,
-        message: "Duplicate value found. Username or email already exists."
+        message: "User ID required"
       });
     }
 
-    next(err);
-  }
-};
-
-// SEARCH USER
-exports.searchUser = async (req, res, next) => {
-  try {
-    const uid = sanitizeString(req.query.uid);
-
-    if (!uid) {
+    if (sameId(currentUserId, otherUserId)) {
       return res.status(400).json({
         success: false,
-        message: "Search query required"
+        message: "Cannot chat with yourself"
       });
     }
 
-    const query = uid.toLowerCase();
+    let chat = await Chat.findOne({
+      members: { $all: [currentUserId, otherUserId] }
+    });
 
-    const user = await User.findOne({
-      $or: [
-        { uid: query },
-        { username: query }
-      ],
-      _id: { $ne: req.user._id }
-    }).select("_id uid name username avatar bio isOnline lastSeen status");
-
-    if (!user) {
-      return res.json({
-        success: false
+    if (!chat) {
+      chat = await Chat.create({
+        members: [currentUserId, otherUserId],
+        unreadCounts: {
+          [String(currentUserId)]: 0,
+          [String(otherUserId)]: 0
+        }
       });
     }
 
     res.json({
       success: true,
-      user: {
-        id: user._id,
-        uid: user.uid,
-        name: user.name,
-        username: user.username,
-        avatar: user.avatar || "",
-        bio: user.bio || "",
-        isOnline: !!user.isOnline,
-        lastSeen: user.lastSeen || null
-      }
+      roomId: chat._id
     });
+
+  } catch (err) {
+    next(err);
+  }
+};
+
+// ✅ GET USER CHATS
+exports.getUserChats = async (req, res, next) => {
+  try {
+    const currentUserId = req.user._id;
+
+    const chats = await Chat.find({
+      members: currentUserId
+    })
+      .populate("members", "username name avatar uid bio isOnline lastSeen")
+      .populate("lastMessage", "content status createdAt sender receiver")
+      .sort({ updatedAt: -1 });
+
+    const formatted = chats.map(chat => {
+      const otherUser = chat.members.find(m => !sameId(m._id, currentUserId));
+
+      return {
+        _id: chat._id,
+        user: otherUser,
+        lastMessage: chat.lastMessage,
+        unreadCount: mapGet(chat.unreadCounts, currentUserId),
+        updatedAt: chat.updatedAt
+      };
+    });
+
+    res.json({
+      success: true,
+      chats: formatted
+    });
+
+  } catch (err) {
+    next(err);
+  }
+};
+
+// ✅ GET CHAT MESSAGES
+exports.getChatMessages = async (req, res, next) => {
+  try {
+    const currentUserId = req.user._id;
+    const chatId = req.params.chatId;
+
+    const chat = await Chat.findById(chatId);
+
+    if (!chat || !chat.members.some(id => sameId(id, currentUserId))) {
+      return res.status(403).json({
+        success: false,
+        message: "Access denied"
+      });
+    }
+
+    const messages = await Message.find({ chat: chatId })
+      .populate("sender", "username name avatar")
+      .populate("receiver", "username name avatar")
+      .sort({ createdAt: 1 });
+
+    res.json({
+      success: true,
+      messages
+    });
+
+  } catch (err) {
+    next(err);
+  }
+};
+
+// ✅ SEND MESSAGE
+exports.sendMessage = async (req, res, next) => {
+  try {
+    const currentUserId = req.user._id;
+    const chatId = req.params.chatId;
+    const content = String(req.body.content || "").trim();
+
+    if (!content) {
+      return res.status(400).json({
+        success: false,
+        message: "Message required"
+      });
+    }
+
+    const chat = await Chat.findById(chatId);
+
+    if (!chat || !chat.members.some(id => sameId(id, currentUserId))) {
+      return res.status(403).json({
+        success: false,
+        message: "Not allowed"
+      });
+    }
+
+    const receiverId = chat.members.find(id => !sameId(id, currentUserId));
+
+    const message = await Message.create({
+      chat: chatId,
+      sender: currentUserId,
+      receiver: receiverId,
+      content,
+      status: "sent"
+    });
+
+    chat.lastMessage = message._id;
+    chat.lastMessageAt = message.createdAt;
+
+    mapSet(chat, receiverId, mapGet(chat.unreadCounts, receiverId) + 1);
+
+    await chat.save();
+
+    const populatedMessage = await Message.findById(message._id)
+      .populate("sender", "username name avatar")
+      .populate("receiver", "username name avatar");
+
+    res.status(201).json({
+      success: true,
+      message: populatedMessage
+    });
+
+  } catch (err) {
+    next(err);
+  }
+};
+
+// ✅ MARK CHAT AS SEEN
+exports.markChatSeen = async (req, res, next) => {
+  try {
+    const currentUserId = req.user._id;
+    const chatId = req.params.chatId;
+
+    const chat = await Chat.findById(chatId);
+
+    if (!chat || !chat.members.some(id => sameId(id, currentUserId))) {
+      return res.status(403).json({
+        success: false,
+        message: "Access denied"
+      });
+    }
+
+    await Message.updateMany(
+      {
+        chat: chatId,
+        receiver: currentUserId,
+        status: { $in: ["sent", "delivered"] }
+      },
+      {
+        $set: {
+          status: "seen",
+          seenAt: new Date()
+        }
+      }
+    );
+
+    mapSet(chat, currentUserId, 0);
+    await chat.save();
+
+    res.json({
+      success: true
+    });
+
   } catch (err) {
     next(err);
   }
