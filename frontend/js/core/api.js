@@ -1,6 +1,5 @@
 // js/core/api.js
 // VibeChat — centralized REST API calls
-// All functions return parsed JSON or throw an Error with .message
 
 (function () {
 
@@ -16,11 +15,12 @@
     if (token) headers["Authorization"] = "Bearer " + token;
 
     var opts = { method: method, headers: headers };
+
     if (body !== undefined && body !== null) {
       opts.body = JSON.stringify(body);
     }
 
-    var res  = await fetch(url, opts);
+    var res = await fetch(url, opts);
     var data = await res.json().catch(function () { return {}; });
 
     if (!res.ok) {
@@ -36,7 +36,6 @@
     /* ─── Auth ─── */
 
     login: async function (payload) {
-      // payload: { identifier, password }
       return request("POST", "/auth/login", payload);
     },
 
@@ -44,16 +43,23 @@
       return request("POST", "/auth/register", payload);
     },
 
+    // ✅ SEND OTP
+    sendOTP: async function (email) {
+      return request("POST", "/auth/send-otp", { email: email });
+    },
+
+    // ✅ VERIFY OTP (optional but recommended)
+    verifyOTP: async function (email, otp) {
+      return request("POST", "/auth/verify-otp", { email: email, otp: otp });
+    },
+
     /* ─── Profile ─── */
 
-    // GET /users/me — returns current user object
     getMyProfile: async function (token) {
       var data = await request("GET", "/users/me", null, token);
-      // backend may return { user: {...} } or the object directly
       return data.user || data;
     },
 
-    // PATCH /users/me — update name, username, bio, avatar
     updateProfile: async function (payload, token) {
       var data = await request("PATCH", "/users/me", payload, token);
       return data.user || data;
