@@ -48,9 +48,14 @@
       return request("POST", "/auth/send-otp", { email: email });
     },
 
-    // ✅ VERIFY OTP (optional but recommended)
+    // ✅ VERIFY OTP ONLY
     verifyOTP: async function (email, otp) {
       return request("POST", "/auth/verify-otp", { email: email, otp: otp });
+    },
+
+    // 🔥 FINAL FIX (IMPORTANT)
+    verifyOTPAndSignup: async function (payload) {
+      return request("POST", "/auth/verify-otp", payload);
     },
 
     /* ─── Profile ─── */
