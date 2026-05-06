@@ -1,114 +1,37 @@
 const mongoose = require("mongoose");
-const crypto = require("crypto");
 
-function generateUID() {
-  return "vibe_" + crypto.randomBytes(3).toString("hex");
-}
-
-const userSchema = new mongoose.Schema(
+const chatSchema = new mongoose.Schema(
   {
-    uid: {
-      type: String,
-      unique: true,
-      index: true,
-      default: generateUID
-    },
+    members: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "User",
+        required: true
+      }
+    ],
 
-    // ADDED
-    name: {
-      type: String,
-      required: true,
-      trim: true
-    },
-
-    // ADDED
-    username: {
-      type: String,
-      unique: true,
-      sparse: true,
-      lowercase: true,
-      trim: true,
-      index: true,
+    lastMessage: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Message",
       default: null
     },
 
-    email: {
-      type: String,
-      required: true,
-      unique: true,
-      lowercase: true,
-      trim: true
-    },
-
-    password: {
-      type: String,
-      required: true,
-      minlength: 6
-    },
-
-    // ADDED
-    avatar: {
-      type: String,
-      default: ""
-    },
-
-    // ADDED
-    bio: {
-      type: String,
-      default: ""
-    },
-
-    isVerified: {
-      type: Boolean,
-      default: false
-    },
-
-    status: {
-      type: String,
-      enum: ["online", "offline", "away"],
-      default: "offline"
-    },
-
-    // ADDED
-    isOnline: {
-      type: Boolean,
-      default: false
-    },
-
-    // ADDED
-    socketId: {
-      type: String,
-      default: null
-    },
-
-    // ADDED
-    lastSeen: {
+    lastMessageAt: {
       type: Date,
-      default: null
+      default: null,
+      index: true
+    },
+
+    unreadCounts: {
+      type: Map,
+      of: Number,
+      default: {}
     }
   },
   { timestamps: true }
 );
 
-userSchema.pre("validate", function (next) {
-  if (!this.uid) {
-    this.uid = generateUID();
-  }
+chatSchema.index({ members: 1 });
+chatSchema.index({ lastMessageAt: -1, updatedAt: -1 });
 
-  if (this.username) {
-    this.username = String(this.username).trim().toLowerCase();
-  }
-
-  if (this.avatar == null) {
-    this.avatar = "";
-  }
-
-  if (this.bio == null) {
-    this.bio = "";
-  }
-
-  next();
-});
-
-// UPDATED
-module.exports = mongoose.models.User || mongoose.model("User", userSchema);
+module.exports = mongoose.models.Chat || mongoose.model("Chat", chatSchema);
