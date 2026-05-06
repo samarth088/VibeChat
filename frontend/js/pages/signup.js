@@ -3,25 +3,25 @@
 
 document.addEventListener('DOMContentLoaded', function () {
 
-  var signupForm       = document.getElementById('signupForm');
-  var otpPhase         = document.getElementById('otpPhase');
-  var signupError      = document.getElementById('signupError');
-  var otpError         = document.getElementById('otpError');
-  var otpSuccess       = document.getElementById('otpSuccess');
-  var verifyOtpBtn     = document.getElementById('verifyOtpBtn');
-  var backBtn          = document.getElementById('backBtn');
-  var resendBtn        = document.getElementById('resendBtn');
-  var otpEmailDisplay  = document.getElementById('otpEmailDisplay');
-  var authSubtitle     = document.getElementById('authSubtitle');
-  var timerCount       = document.getElementById('timerCount');
-  var otpTimerEl       = document.getElementById('otpTimer');
-  var submitBtn        = signupForm.querySelector('button[type="submit"]');
-  var otpBoxes         = document.querySelectorAll('.otp-box');
+  var signupForm      = document.getElementById('signupForm');
+  var otpPhase        = document.getElementById('otpPhase');
+  var signupError     = document.getElementById('signupError');
+  var otpError        = document.getElementById('otpError');
+  var otpSuccess      = document.getElementById('otpSuccess');
+  var verifyOtpBtn    = document.getElementById('verifyOtpBtn');
+  var backBtn         = document.getElementById('backBtn');
+  var resendBtn       = document.getElementById('resendBtn');
+  var otpEmailDisplay = document.getElementById('otpEmailDisplay');
+  var authSubtitle    = document.getElementById('authSubtitle');
+  var timerCount      = document.getElementById('timerCount');
+  var otpTimerEl      = document.getElementById('otpTimer');
+  var submitBtn       = signupForm.querySelector('button[type="submit"]');
+  var otpBoxes        = document.querySelectorAll('.otp-box');
 
   var pendingData   = {};
   var timerInterval = null;
 
-  // ── STEP 1: Validate & Send OTP to Email ────────────────────
+  // ── STEP 1: Validate & Send OTP ─────────────────────────────
   signupForm.addEventListener('submit', async function (e) {
     e.preventDefault();
     hide(signupError);
@@ -33,7 +33,6 @@ document.addEventListener('DOMContentLoaded', function () {
     var password        = (formData.get('password')        || '');
     var confirmPassword = (formData.get('confirmPassword') || '');
 
-    // Validations
     if (!fullname)
       return showErr(signupError, 'Please enter your full name.');
     if (!/^[a-zA-Z0-9_]{3,20}$/.test(username))
@@ -52,25 +51,15 @@ document.addEventListener('DOMContentLoaded', function () {
     try {
       await window.VibeAPI.sendOTP(email);
 
-      // Switch to OTP phase
       signupForm.classList.add('hidden');
       otpPhase.classList.remove('hidden');
-      authSubtitle.textContent = 'Verify your email';
-      // Mask email: raj***@gmail.com
-      var parts = email.split('@');
+      if (authSubtitle) authSubtitle.textContent = 'Verify your email';
+
+      var parts  = email.split('@');
       var masked = parts[0].slice(0, 3) + '***@' + parts[1];
-      otpEmailDisplay.textContent = masked;
-      otpBoxes[0].focus();
-      if (window.ENV && window.ENV.DEV_MODE) {
-        var hint = document.getElementById('devHint');
-        if (!hint) {
-          hint = document.createElement('p');
-          hint.id = 'devHint';
-          hint.style.cssText = 'text-align:center;color:#ffc107;font-size:12px;margin-bottom:10px;';
-          hint.textContent = '🔧 DEV MODE: OTP is 123456';
-          document.getElementById('otpBoxes').before(hint);
-        }
-      }
+      if (otpEmailDisplay) otpEmailDisplay.textContent = masked;
+
+      if (otpBoxes[0]) otpBoxes[0].focus();
       startTimer(30);
 
     } catch (err) {
@@ -81,7 +70,8 @@ document.addEventListener('DOMContentLoaded', function () {
 
   // ── STEP 2: Verify OTP & Create Account ─────────────────────
   verifyOtpBtn.addEventListener('click', async function () {
-    hide(otpError); hide(otpSuccess);
+    hide(otpError);
+    hide(otpSuccess);
 
     var otp = Array.from(otpBoxes).map(function (b) { return b.value; }).join('');
     if (otp.length < 6)
@@ -98,16 +88,23 @@ document.addEventListener('DOMContentLoaded', function () {
         password: pendingData.password
       });
 
+      // FIX: save full session with all fields backend now returns
+      var userData = response.user || {};
       var session = {
-        userId:      response.userId,
-        idFormatted: response.idFormatted || window.VibeState.formatId(response.userId),
-        username:    response.username || pendingData.username,
-        token:       response.token || '',
-        profile:     response.profile || {}
+        userId:      String(userData.id  || response.userId  || ''),
+        uid:         String(userData.uid || response.idFormatted || ''),
+        idFormatted: String(userData.uid || response.idFormatted || ''),
+        name:        userData.name       || pendingData.fullname  || '',
+        username:    userData.username   || response.username     || pendingData.username || '',
+        email:       userData.email      || pendingData.email     || '',
+        avatar:      userData.avatar     || '',
+        bio:         userData.bio        || '',
+        token:       response.token      || ''
       };
 
       window.VibeState.saveSession(session);
-      showOk(otpSuccess, '✅ Account created! Your ID: ' + session.idFormatted + ' — Redirecting...');
+
+      showOk(otpSuccess, '✅ Account created! Your ID: ' + session.uid + ' — Redirecting...');
 
       setTimeout(function () {
         window.location.assign('./app.html');
@@ -116,10 +113,11 @@ document.addEventListener('DOMContentLoaded', function () {
     } catch (err) {
       setBtn(verifyOtpBtn, false, 'Verify & Create Account');
       showErr(otpError, err.message || 'Invalid OTP. Try again.');
-      document.getElementById('otpBoxes').classList.add('shake');
-      setTimeout(function () {
-        document.getElementById('otpBoxes').classList.remove('shake');
-      }, 500);
+      var otpBoxesEl = document.getElementById('otpBoxes');
+      if (otpBoxesEl) {
+        otpBoxesEl.classList.add('shake');
+        setTimeout(function () { otpBoxesEl.classList.remove('shake'); }, 500);
+      }
     }
   });
 
@@ -127,17 +125,18 @@ document.addEventListener('DOMContentLoaded', function () {
   backBtn.addEventListener('click', function () {
     otpPhase.classList.add('hidden');
     signupForm.classList.remove('hidden');
-    authSubtitle.textContent = 'Create your account. Start vibing.';
+    if (authSubtitle) authSubtitle.textContent = 'Create your account. Start vibing.';
     setBtn(submitBtn, false, 'Send OTP');
     clearInterval(timerInterval);
     Array.from(otpBoxes).forEach(function (b) { b.value = ''; });
-    hide(otpError); hide(otpSuccess);
+    hide(otpError);
+    hide(otpSuccess);
   });
 
   // ── Resend OTP ───────────────────────────────────────────────
   resendBtn.addEventListener('click', async function () {
     resendBtn.classList.add('hidden');
-    otpTimerEl.classList.remove('hidden');
+    if (otpTimerEl) otpTimerEl.classList.remove('hidden');
     try {
       await window.VibeAPI.sendOTP(pendingData.email);
       startTimer(30);
@@ -148,7 +147,7 @@ document.addEventListener('DOMContentLoaded', function () {
     }
   });
 
-  // ── OTP box keyboard handling ────────────────────────────────
+  // ── OTP box keyboard nav ─────────────────────────────────────
   otpBoxes.forEach(function (box, i) {
     box.addEventListener('input', function () {
       this.value = this.value.replace(/\D/g, '').slice(0, 1);
@@ -161,7 +160,8 @@ document.addEventListener('DOMContentLoaded', function () {
     });
     box.addEventListener('paste', function (e) {
       e.preventDefault();
-      var pasted = (e.clipboardData || window.clipboardData).getData('text').replace(/\D/g, '').slice(0, 6);
+      var pasted = (e.clipboardData || window.clipboardData).getData('text')
+        .replace(/\D/g, '').slice(0, 6);
       pasted.split('').forEach(function (ch, idx) {
         if (otpBoxes[idx]) otpBoxes[idx].value = ch;
       });
@@ -172,24 +172,24 @@ document.addEventListener('DOMContentLoaded', function () {
   // ── Timer ────────────────────────────────────────────────────
   function startTimer(sec) {
     clearInterval(timerInterval);
-    timerCount.textContent = sec;
-    otpTimerEl.classList.remove('hidden');
-    resendBtn.classList.add('hidden');
+    if (timerCount) timerCount.textContent = sec;
+    if (otpTimerEl) otpTimerEl.classList.remove('hidden');
+    if (resendBtn)  resendBtn.classList.add('hidden');
     timerInterval = setInterval(function () {
       sec--;
-      timerCount.textContent = sec;
+      if (timerCount) timerCount.textContent = sec;
       if (sec <= 0) {
         clearInterval(timerInterval);
-        otpTimerEl.classList.add('hidden');
-        resendBtn.classList.remove('hidden');
+        if (otpTimerEl) otpTimerEl.classList.add('hidden');
+        if (resendBtn)  resendBtn.classList.remove('hidden');
       }
     }, 1000);
   }
 
   // ── Helpers ──────────────────────────────────────────────────
-  function showErr(el, msg) { el.textContent = msg; el.classList.remove('hidden'); }
-  function showOk(el, msg)  { el.textContent = msg; el.classList.remove('hidden'); }
-  function hide(el)         { el.classList.add('hidden'); el.textContent = ''; }
-  function setBtn(btn, on, label) { btn.disabled = on; btn.textContent = label; }
+  function showErr(el, msg) { if (el) { el.textContent = msg; el.classList.remove('hidden'); } }
+  function showOk(el, msg)  { if (el) { el.textContent = msg; el.classList.remove('hidden'); } }
+  function hide(el)         { if (el) { el.classList.add('hidden'); el.textContent = ''; } }
+  function setBtn(btn, on, label) { if (btn) { btn.disabled = on; btn.textContent = label; } }
 
 });
