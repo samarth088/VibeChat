@@ -1,9 +1,10 @@
-
 const mongoose = require("mongoose");
 const crypto = require("crypto");
 
+// Game-style UID: VIBE-4729
 function generateUID() {
-  return "vibe_" + crypto.randomBytes(3).toString("hex");
+  const num = Math.floor(10000 + Math.random() * 90000); // 5-digit: 10000-99999
+  return "VIBE-" + num;
 }
 
 const userSchema = new mongoose.Schema(
@@ -15,14 +16,12 @@ const userSchema = new mongoose.Schema(
       default: generateUID
     },
 
-    // ADDED
     name: {
       type: String,
       required: true,
       trim: true
     },
 
-    // ADDED
     username: {
       type: String,
       unique: true,
@@ -47,13 +46,11 @@ const userSchema = new mongoose.Schema(
       minlength: 6
     },
 
-    // ADDED
     avatar: {
       type: String,
       default: ""
     },
 
-    // ADDED
     bio: {
       type: String,
       default: ""
@@ -70,19 +67,16 @@ const userSchema = new mongoose.Schema(
       default: "offline"
     },
 
-    // ADDED
     isOnline: {
       type: Boolean,
       default: false
     },
 
-    // ADDED
     socketId: {
       type: String,
       default: null
     },
 
-    // ADDED
     lastSeen: {
       type: Date,
       default: null
@@ -100,14 +94,10 @@ userSchema.pre("validate", function (next) {
     this.username = String(this.username).trim().toLowerCase();
   }
 
-  if (this.avatar == null) {
-    this.avatar = "";
-  }
+  if (this.avatar == null) this.avatar = "";
+  if (this.bio == null) this.bio = "";
 
-  if (this.bio == null) {
-    this.bio = "";
-  }
-next();
+  next();
 });
 
-module.exports = mongoose.model("User", userSchema);
+module.exports = mongoose.models.User || mongoose.model("User", userSchema);
