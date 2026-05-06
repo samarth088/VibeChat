@@ -15,12 +15,11 @@
     if (token) headers["Authorization"] = "Bearer " + token;
 
     var opts = { method: method, headers: headers };
-
     if (body !== undefined && body !== null) {
       opts.body = JSON.stringify(body);
     }
 
-    var res = await fetch(url, opts);
+    var res  = await fetch(url, opts);
     var data = await res.json().catch(function () { return {}; });
 
     if (!res.ok) {
@@ -35,27 +34,32 @@
 
     /* ─── Auth ─── */
 
+    // FIX: backend expects { identifier OR email, password }
     login: async function (payload) {
-      return request("POST", "/auth/login", payload);
+      return request("POST", "/auth/login", {
+        identifier: payload.identifier || payload.email,
+        password:   payload.password
+      });
     },
 
-    signup: async function (payload) {
-      return request("POST", "/auth/register", payload);
-    },
-
-    // ✅ SEND OTP
     sendOTP: async function (email) {
       return request("POST", "/auth/send-otp", { email: email });
     },
 
-    // ✅ VERIFY OTP ONLY
     verifyOTP: async function (email, otp) {
       return request("POST", "/auth/verify-otp", { email: email, otp: otp });
     },
 
-    // 🔥 FINAL FIX (IMPORTANT)
+    // FIX: This now hits /auth/verify-otp with all signup data combined
+    // Backend verifyOtp() detects fullname+password and creates account in one shot
     verifyOTPAndSignup: async function (payload) {
-      return request("POST", "/auth/verify-otp", payload);
+      return request("POST", "/auth/verify-otp", {
+        email:    payload.email,
+        otp:      payload.otp,
+        fullname: payload.fullname,
+        username: payload.username,
+        password: payload.password
+      });
     },
 
     /* ─── Profile ─── */
@@ -65,29 +69,31 @@
       return data.user || data;
     },
 
+    // FIX: was PATCH, backend route is PUT /users/me
     updateProfile: async function (payload, token) {
-      var data = await request("PATCH", "/users/me", payload, token);
+      var data = await request("PUT", "/users/me", payload, token);
       return data.user || data;
     },
 
     /* ─── User search ─── */
 
+    // FIX: backend searchUser reads req.query.uid — was sending ?q=
     searchUsers: async function (query, token) {
       var encoded = encodeURIComponent(query);
-      var data = await request("GET", "/users/search?q=" + encoded, null, token);
-      return data.users || data.results || data || [];
+      var data = await request("GET", "/users/search?uid=" + encoded, null, token);
+      return data.user ? [data.user] : [];
     },
 
-    getUserById: async function (userId, token) {
-      var data = await request("GET", "/users/" + userId, null, token);
-      return data.user || data;
+    getAllUsers: async function (token) {
+      var data = await request("GET", "/users/all", null, token);
+      return data.users || [];
     },
 
     /* ─── Chats ─── */
 
     getChats: async function (token) {
       var data = await request("GET", "/chats", null, token);
-      return data.chats || data.data || [];
+      return data.chats || [];
     },
 
     openOrCreateChat: async function (userId, token) {
@@ -96,7 +102,7 @@
 
     getMessages: async function (roomId, token) {
       var data = await request("GET", "/chats/" + roomId + "/messages", null, token);
-      return data.messages || data || [];
+      return data.messages || [];
     },
 
     sendMessage: async function (roomId, content, token) {
