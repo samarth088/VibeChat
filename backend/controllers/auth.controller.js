@@ -1,8 +1,8 @@
 // controllers/auth.controller.js
 const bcrypt = require("bcryptjs");
-const User = require("../models/User");
+const User   = require("../models/User");
 const OtpModel = require("../models/Otp");
-const { sendEmail } = require("../utils/email");
+const { sendEmail }   = require("../utils/email");
 const { generateOtp, getOtpExpiry, isOtpExpired } = require("../utils/otp");
 const { generateToken } = require("../utils/jwt");
 
@@ -34,17 +34,17 @@ exports.sendOtp = async (req, res) => {
 
     const subject = "Your VibeChat OTP Code";
     const html = `
-      <div style="font-family: Arial, sans-serif;">
-        <h2>VibeChat OTP Verification</h2>
-        <p>Your OTP code is:</p>
-        <h1 style="letter-spacing: 5px;">${otp}</h1>
-        <p>This OTP will expire in 10 minutes.</p>
+      <div style="font-family: Arial, sans-serif; max-width: 400px; margin: auto; padding: 20px; border-radius: 12px; background: #0d1117; color: #ffffff;">
+        <h2 style="color: #7c6aff;">VibeChat</h2>
+        <p>Your OTP verification code:</p>
+        <h1 style="letter-spacing: 8px; font-size: 36px; color: #ffffff;">${otp}</h1>
+        <p style="color: #888;">This OTP expires in 10 minutes. Do not share it with anyone.</p>
       </div>
     `;
 
     await sendEmail(emailLower, subject, html);
 
-    return res.status(200).json({ success: true, message: `OTP sent to ${emailLower}. Check your inbox.` });
+    return res.status(200).json({ success: true, message: `OTP sent to ${emailLower}` });
 
   } catch (error) {
     console.error("sendOtp error:", error);
@@ -58,7 +58,7 @@ exports.sendOtp = async (req, res) => {
 // ─────────────────────────────────────────────
 exports.verifyOtp = async (req, res) => {
   try {
-    const { email, otp } = req.body;
+    const { email, otp, fullname, username, password } = req.body;
 
     if (!email || !otp) {
       return res.status(400).json({ success: false, message: "Email and OTP are required" });
@@ -80,6 +80,16 @@ exports.verifyOtp = async (req, res) => {
       return res.status(400).json({ success: false, message: "Invalid OTP. Please try again." });
     }
 
+    // If signup data is also passed, create the account directly
+    // FIX: frontend's verifyOTPAndSignup sends fullname+username+password together
+    if (fullname && password) {
+      otpRecord.verified = true;
+      await otpRecord.save();
+
+      return await _createAccount({ emailLower, fullname, username, password, res });
+    }
+
+    // OTP-only verify (just marking verified)
     otpRecord.verified = true;
     await otpRecord.save();
 
@@ -93,23 +103,20 @@ exports.verifyOtp = async (req, res) => {
 
 
 // ─────────────────────────────────────────────
-// SIGNUP
+// SIGNUP (separate endpoint, also works)
 // ─────────────────────────────────────────────
 exports.signup = async (req, res) => {
   try {
-    const { name, email, password } = req.body;
+    const { name, fullname, email, password, username: reqUsername } = req.body;
 
-    if (!name || !email || !password) {
+    const displayName = (fullname || name || "").trim();
+    if (!displayName || !email || !password) {
       return res.status(400).json({ success: false, message: "Name, email and password are required" });
     }
 
     const emailLower = email.toLowerCase().trim();
-    const username = name.trim().toLowerCase().replace(/\s+/g, "");
 
-    if (!username) {
-      return res.status(400).json({ success: false, message: "Invalid username." });
-    }
-
+    // Check OTP was verified
     const otpRecord = await OtpModel.findOne({ email: emailLower, verified: true });
     if (!otpRecord) {
       return res.status(400).json({ success: false, message: "Email not verified. Please verify OTP first." });
@@ -119,40 +126,12 @@ exports.signup = async (req, res) => {
       return res.status(409).json({ success: false, message: "Email already registered." });
     }
 
-    // ✅ If username taken, append random digits to make it unique
-    let finalUsername = username;
-    const usernameExists = await User.findOne({ username });
-    if (usernameExists) {
-      finalUsername = username + Math.floor(Math.random() * 9000 + 1000);
-    }
-
-    const hashedPassword = await bcrypt.hash(password, 12);
-
-    const user = await User.create({
-      name: name.trim(),
-      username: finalUsername,
-      email: emailLower,
-      password: hashedPassword,
-      isVerified: true,
-    });
-
-    await OtpModel.deleteMany({ email: emailLower });
-
-    const token = generateToken(user._id);
-
-    return res.status(201).json({
-      success: true,
-      message: "Account created successfully!",
-      token,
-      user: {
-        id:         user._id,
-        uid:        user.uid,
-        name:       user.name,
-        username:   user.username,
-        email:      user.email,
-        avatar:     user.avatar,
-        isVerified: user.isVerified,
-      },
+    return await _createAccount({
+      emailLower,
+      fullname: displayName,
+      username: reqUsername || null,
+      password,
+      res
     });
 
   } catch (error) {
@@ -163,28 +142,94 @@ exports.signup = async (req, res) => {
 
 
 // ─────────────────────────────────────────────
-// LOGIN  ✅ FIX: email OR username dono se login
+// INTERNAL: Create user account
+// ─────────────────────────────────────────────
+async function _createAccount({ emailLower, fullname, username, password, res }) {
+  try {
+    if (await User.findOne({ email: emailLower, isVerified: true })) {
+      return res.status(409).json({ success: false, message: "Email already registered." });
+    }
+
+    // Build username from provided or from name
+    let baseUsername = username
+      ? String(username).trim().toLowerCase().replace(/[^a-z0-9_.]/g, "")
+      : fullname.trim().toLowerCase().replace(/\s+/g, "").replace(/[^a-z0-9_.]/g, "");
+
+    if (!baseUsername || baseUsername.length < 3) {
+      baseUsername = "user";
+    }
+
+    // Make username unique
+    let finalUsername = baseUsername;
+    const taken = await User.findOne({ username: finalUsername });
+    if (taken) {
+      finalUsername = baseUsername + Math.floor(1000 + Math.random() * 9000);
+    }
+
+    const hashedPassword = await bcrypt.hash(password, 12);
+
+    const user = await User.create({
+      name:       fullname,
+      username:   finalUsername,
+      email:      emailLower,
+      password:   hashedPassword,
+      isVerified: true
+    });
+
+    await OtpModel.deleteMany({ email: emailLower });
+
+    const token = generateToken(user._id);
+
+    return res.status(201).json({
+      success:     true,
+      message:     "Account created successfully!",
+      token,
+      userId:      user._id,
+      idFormatted: user.uid,
+      username:    user.username,
+      user: {
+        id:         user._id,
+        uid:        user.uid,
+        name:       user.name,
+        username:   user.username,
+        email:      user.email,
+        avatar:     user.avatar,
+        isVerified: user.isVerified
+      }
+    });
+
+  } catch (err) {
+    console.error("_createAccount error:", err);
+    return res.status(500).json({ success: false, message: err.message || "Server error" });
+  }
+}
+
+
+// ─────────────────────────────────────────────
+// LOGIN — email OR username dono se kaam karta hai
 // ─────────────────────────────────────────────
 exports.login = async (req, res) => {
   try {
-    const { email, password } = req.body;
+    // FIX: frontend login.js sends { identifier, password }
+    // lekin backend expect karta tha { email, password }
+    const { email, identifier, password } = req.body;
 
-    if (!email || !password) {
-      return res.status(400).json({ success: false, message: "Email and password are required" });
+    const loginId = (identifier || email || "").toLowerCase().trim();
+
+    if (!loginId || !password) {
+      return res.status(400).json({ success: false, message: "Email/username and password are required" });
     }
 
-    const identifier = email.toLowerCase().trim();
-
-    // ✅ FIX: $or query — email ya username kuch bhi ho kaam karega
+    // Search by email OR username
     const user = await User.findOne({
       $or: [
-        { email: identifier },
-        { username: identifier }
+        { email: loginId },
+        { username: loginId }
       ]
     });
 
     if (!user) {
-      return res.status(401).json({ success: false, message: "Invalid email or password" });
+      return res.status(401).json({ success: false, message: "Invalid credentials" });
     }
 
     if (!user.isVerified) {
@@ -193,7 +238,7 @@ exports.login = async (req, res) => {
 
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) {
-      return res.status(401).json({ success: false, message: "Invalid email or password" });
+      return res.status(401).json({ success: false, message: "Invalid credentials" });
     }
 
     const token = generateToken(user._id);
@@ -202,6 +247,7 @@ exports.login = async (req, res) => {
       success: true,
       message: "Login successful",
       token,
+      userId:  user._id,
       user: {
         id:         user._id,
         uid:        user.uid,
@@ -209,8 +255,9 @@ exports.login = async (req, res) => {
         username:   user.username,
         email:      user.email,
         avatar:     user.avatar,
-        isVerified: user.isVerified,
-      },
+        bio:        user.bio,
+        isVerified: user.isVerified
+      }
     });
 
   } catch (error) {
