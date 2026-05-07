@@ -53,3 +53,4 @@ messageSchema.index({ chat: 1, createdAt: 1 });
 messageSchema.index({ group: 1, createdAt: 1 });
 
 module.exports = mongoose.models.Message || mongoose.model("Message", messageSchema);
+
