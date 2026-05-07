@@ -1,4 +1,5 @@
 // socket/chat.socket.js
+
 // Real-time DM messaging — send, deliver, read receipts
 
 const Message = require("../models/Message");
