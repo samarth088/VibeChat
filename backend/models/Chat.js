@@ -35,3 +35,4 @@ chatSchema.index({ members: 1 });
 chatSchema.index({ lastMessageAt: -1, updatedAt: -1 });
 
 module.exports = mongoose.models.Chat || mongoose.model("Chat", chatSchema);
+
