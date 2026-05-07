@@ -1,4 +1,5 @@
 // js/pages/signup.js
+
 // 2-step signup: Step 1 = details, Step 2 = Email OTP verify
 
 document.addEventListener('DOMContentLoaded', function () {
