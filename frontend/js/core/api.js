@@ -1,6 +1,7 @@
 // js/core/api.js
 // VibeChat — centralized REST API calls
 
+
 (function () {
 
   function getBase() {
