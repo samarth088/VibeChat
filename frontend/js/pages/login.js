@@ -1,5 +1,6 @@
 // js/pages/login.js
 
+
 document.addEventListener("DOMContentLoaded", function () {
   var form      = document.getElementById("loginForm");
   var errorBox  = document.getElementById("loginError");
