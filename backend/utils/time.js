@@ -14,3 +14,4 @@ module.exports = {
   formatTime,
   getTimestamp
 };
+
