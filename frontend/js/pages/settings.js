@@ -75,3 +75,4 @@ document.addEventListener("DOMContentLoaded", function () {
     submitBtn.textContent = on ? "Signing in..." : "Sign in";
   }
 });
+
