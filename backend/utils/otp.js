@@ -24,3 +24,4 @@ function isOtpExpired(expiresAt) {
 }
 
 module.exports = { generateOtp, getOtpExpiry, isOtpExpired };
+
