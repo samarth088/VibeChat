@@ -1,4 +1,5 @@
 // js/pages/calls.js
+
 // Calls tab logic — non-module
 
 function startCall(uid) {
