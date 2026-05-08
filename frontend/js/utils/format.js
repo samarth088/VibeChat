@@ -1,4 +1,5 @@
 // js/utils/format.js
+
 // Text + string formatting utilities — non-module
 
 function truncate(str, maxLen) {
