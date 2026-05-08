@@ -1,4 +1,5 @@
 // js/ui/header.js
+
 // Live clock + header init — non-module
 
 function updateClock() {
