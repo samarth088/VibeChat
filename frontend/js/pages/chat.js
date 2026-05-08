@@ -1,4 +1,5 @@
 // js/pages/chat.js
+
 // VibeChat — DM list + chat window
 // Features: profile display, new-msg-on-top, last seen, avatar in header,
 //           real-time socket, read receipts, optimistic send
