@@ -1,4 +1,5 @@
 // js/utils/validators.js
+
 // Input validation utilities — non-module
 
 function isValidUsername(username) {
