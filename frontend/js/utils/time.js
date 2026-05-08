@@ -1,4 +1,5 @@
 // js/utils/time.js
+
 // Time + date formatting utilities — non-module
 
 function formatTime(timestamp) {
