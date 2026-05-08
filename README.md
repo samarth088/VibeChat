@@ -28,9 +28,6 @@ Database
 
 - MongoDB
 
-Screenshots
-
-(Add screenshots here)
 
 Installation
 
