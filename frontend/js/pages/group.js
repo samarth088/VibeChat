@@ -1,4 +1,5 @@
 // js/pages/group.js
+
 // Group tab logic — non-module
 
 function createGroup() {
