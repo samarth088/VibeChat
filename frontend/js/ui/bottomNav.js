@@ -1,4 +1,5 @@
 // js/ui/bottomNav.js
+
 // Tab switching — uses classList instead of inline style to match CSS
 // FIX: was using display:'block' which broke flex-based group/calls layout
 
