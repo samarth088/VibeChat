@@ -17,3 +17,4 @@ requiredEnv.forEach((key) => {
 });
 
 console.log("✅ Environment variables loaded");
+
