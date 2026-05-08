@@ -35,3 +35,4 @@ const protect = async (req, res, next) => {
 
 // ✅ Named export "protect" — user.routes.js mein { protect } se import hota hai
 module.exports = { protect };
+
