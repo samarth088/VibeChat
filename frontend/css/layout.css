@@ -36,18 +36,23 @@
 
 .brand-logo {
   position: absolute;
-  top: 24px;
+  top: 20px;
   left: 50%;
   transform: translateX(-50%);
   z-index: 50;
-  width: 90px;
+  white-space: nowrap;
 }
-.brand-logo img {
-  width: 100%;
-  height: auto;
-  display: block;
-  opacity: 0.98;
-  filter: drop-shadow(0 0 10px rgba(0,140,255,0.7)) drop-shadow(0 0 20px rgba(0,80,200,0.45));
+.brand-text {
+  font-family: 'Segoe UI', sans-serif;
+  font-size: 20px;
+  font-weight: 800;
+  letter-spacing: 1.5px;
+  background: linear-gradient(90deg, #4db8ff 0%, #7c6aff 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  filter: drop-shadow(0 0 8px rgba(77,184,255,0.5));
+  display: inline-block;
 }
 
 /* ── Search bar ── */
@@ -192,4 +197,3 @@
 }
 #dmContent.active { display: flex; }
 #dmContent::-webkit-scrollbar { width: 0; }
-
