@@ -206,17 +206,67 @@
           "Authorization": "Bearer " + getToken(token)
         },
         body: JSON.stringify({
-          otherUserId: userId
+          userId: userId
         })
       }).then(function (res) {
         if (!res.roomId) {
           throw new Error("Chat creation failed");
         }
-
-        return {
-          roomId: res.roomId
-        };
+        return { roomId: res.roomId };
       });
+    },
+
+    // FIX: chat.js openChatFromSearch calls openOrCreateChat — was missing here
+    // socket.js overwrites window.VibeAPI after api.js, so this must exist here too
+    openOrCreateChat: function (userId, token) {
+      return fetchJSON(cfg.API_URL + "/chats", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": "Bearer " + getToken(token)
+        },
+        body: JSON.stringify({
+          userId: userId
+        })
+      }).then(function (res) {
+        if (!res.roomId) {
+          throw new Error("Chat creation failed");
+        }
+        return { roomId: res.roomId };
+      });
+    },
+
+    // FIX: chat.js also calls getChats, getMessages, sendMessage, markSeen
+    // These were in api.js but socket.js overwrites VibeAPI — add them here too
+    getChats: function (token) {
+      return fetchJSON(cfg.API_URL + "/chats", {
+        headers: { "Authorization": "Bearer " + getToken(token) }
+      }).then(function (res) { return res.chats || []; });
+    },
+
+    getMessages: function (roomId, token) {
+      return fetchJSON(cfg.API_URL + "/chats/" + roomId + "/messages", {
+        headers: { "Authorization": "Bearer " + getToken(token) }
+      }).then(function (res) { return res.messages || []; });
+    },
+
+    sendMessage: function (roomId, content, token) {
+      return fetchJSON(cfg.API_URL + "/chats/" + roomId + "/messages", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": "Bearer " + getToken(token)
+        },
+        body: JSON.stringify({ content: content })
+      });
+    },
+
+    markSeen: function (roomId, token) {
+      return fetchJSON(cfg.API_URL + "/chats/" + roomId + "/seen", {
+        method: "PATCH",
+        headers: { "Authorization": "Bearer " + getToken(token) }
+      }).catch(function () {});
     }
+
   };
 })();
