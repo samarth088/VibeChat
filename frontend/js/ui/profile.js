@@ -352,9 +352,51 @@
     loadProfile();
   });
 
+  // Quick photo upload directly from profile sheet avatar click
+  async function quickUploadPhoto(input) {
+    var file = input && input.files && input.files[0];
+    if (!file) return;
+
+    var sess = getSession();
+    if (!sess || !sess.token) { showToast("Session expired"); return; }
+
+    // Show loading state on avatar
+    var avatarEl = document.getElementById("profileAvatar");
+    if (avatarEl) avatarEl.style.opacity = "0.5";
+
+    var reader = new FileReader();
+    reader.onload = async function () {
+      try {
+        var base64 = reader.result;
+        var updated = await window.VibeAPI.updateProfile({ avatar: base64 }, sess.token);
+
+        sess.avatar = updated.avatar || base64;
+        saveSessionSafe(sess);
+        applyProfileToUI(sess);
+
+        // Update avatar in profile sheet immediately
+        if (avatarEl) {
+          avatarEl.style.opacity = "1";
+          avatarEl.innerHTML = '<img src="' + (updated.avatar || base64) + '" alt="avatar" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">'
+        }
+
+        showToast("Profile photo updated! ✅");
+
+        document.dispatchEvent(new CustomEvent("profile:updated", {
+          detail: { avatar: updated.avatar || base64 }
+        }));
+
+      } catch (err) {
+        if (avatarEl) avatarEl.style.opacity = "1";
+        showToast(err && err.message ? err.message : "Photo upload failed");
+      }
+    };
+    reader.readAsDataURL(file);
+  }
+
   window.VibeProfile = {
     openEditor: openEditor,
-    refresh: loadProfile
+    refresh: loadProfile,
+    quickUploadPhoto: quickUploadPhoto
   };
 })();
-
