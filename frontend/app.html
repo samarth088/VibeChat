@@ -51,7 +51,7 @@
 
   <!-- Brand Logo -->
   <div class="brand-logo">
-    <img src="assets/images/logo.png" alt="logo" height="40"/>
+    <span class="brand-text">VibeChat</span>
   </div>
 
   <!-- Search Bar -->
@@ -171,12 +171,22 @@
     <div class="sheet" onclick="event.stopPropagation()">
       <div class="sheet-handle"></div>
 
-      <!-- Avatar — clicking it also opens editor -->
+      <!-- Avatar — clicking opens photo picker directly -->
       <div class="profile-header">
-        <div class="profile-avatar-big" id="profileAvatar"
-             onclick="closeSheet(event,'profileSheet'); setTimeout(function(){ window.VibeProfile && window.VibeProfile.openEditor(); }, 200);"
-             style="cursor:pointer;" title="Edit photo">
-          Y
+        <div style="position:relative;width:80px;margin:0 auto 12px;">
+          <div class="profile-avatar-big" id="profileAvatar"
+               onclick="document.getElementById('quickAvatarInput').click()"
+               style="cursor:pointer;margin:0;" title="Change photo">
+            Y
+          </div>
+          <!-- Camera icon overlay -->
+          <div onclick="document.getElementById('quickAvatarInput').click()"
+               style="position:absolute;bottom:0;right:0;width:26px;height:26px;border-radius:50%;
+                      background:linear-gradient(135deg,#0080ff,#0050cc);
+                      display:flex;align-items:center;justify-content:center;cursor:pointer;
+                      border:2px solid #000d24;font-size:13px;">📷</div>
+          <input type="file" id="quickAvatarInput" accept="image/*" style="display:none;"
+                 onchange="window.VibeProfile && window.VibeProfile.quickUploadPhoto(this)"/>
         </div>
         <div class="profile-name" id="profileName">Your Name</div>
         <div class="profile-uid"  id="profileUid">@username · ID: #00001</div>
@@ -212,7 +222,7 @@
 <script src="js/ui/header.js"></script>
 <script src="js/ui/overlays.js"></script>
 <script src="js/ui/bottomNav.js"></script>
-<script src="js/pages/profile.js"></script>
+<script src="js/ui/profile.js"></script>
 <script src="js/pages/chat.js"></script>
 <script src="js/pages/group.js"></script>
 <script src="js/pages/calls.js"></script>
@@ -253,4 +263,3 @@
 
 </body>
 </html>
-
