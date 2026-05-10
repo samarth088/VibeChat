@@ -1,6 +1,6 @@
-// js/core/api.js
-// Production-ready API wrapper
-// Load order: env.js → state.js → api.js
+// js/core/socket.js
+// VibeChat — API wrapper + Real-time Socket.io client
+// Load order: env.js → state.js → api.js → socket.js
 
 (function () {
   var cfg = window.ENV || {};
@@ -268,5 +268,121 @@
       }).catch(function () {});
     }
 
+  };
+})();
+
+// ─── VibeSocket — Real-time Socket.io client ───────────────────────
+(function () {
+  var _socket = null;
+  var _onMessage = null;
+
+  window.VibeSocket = {
+
+    connect: function (token, onMessageCallback) {
+      if (_socket && _socket.connected) return; // already connected
+
+      var cfg = window.ENV || {};
+      var wsUrl = cfg.WS_URL || cfg.API_URL.replace("/api", "") || "";
+
+      _onMessage = onMessageCallback;
+
+      _socket = io(wsUrl, {
+        transports: ["websocket", "polling"],
+        reconnection: true,
+        reconnectionAttempts: 10,
+        reconnectionDelay: 1000
+      });
+
+      _socket.on("connect", function () {
+        console.log("🟢 Socket connected");
+        // Register user so backend knows who this socket belongs to
+        var sess = window.VibeState && window.VibeState.loadSession
+          ? window.VibeState.loadSession() : null;
+        if (sess && sess.userId) {
+          _socket.emit("register", sess.userId);
+        }
+      });
+
+      // Incoming message from another user
+      _socket.on("message", function (data) {
+        if (!_onMessage) return;
+        _onMessage({
+          type: "message",
+          _id: data._id,
+          room: data.roomId || data.room,
+          sender: data.sender && data.sender._id ? data.sender._id : data.sender,
+          content: data.content || data.text || "",
+          text: data.content || data.text || "",
+          createdAt: data.createdAt
+        });
+      });
+
+      // Message status update (delivered/seen)
+      _socket.on("message:status", function (data) {
+        if (!_onMessage) return;
+        _onMessage({
+          type: "status",
+          msgId: data.msgId,
+          status: data.status,
+          room: data.roomId || data.room
+        });
+      });
+
+      // Seen event
+      _socket.on("message:seen", function (data) {
+        if (!_onMessage) return;
+        _onMessage({
+          type: "seen",
+          room: data.roomId || data.room,
+          by: data.by
+        });
+      });
+
+      // Online/offline presence
+      _socket.on("presence", function (data) {
+        if (!_onMessage) return;
+        _onMessage({
+          type: "presence",
+          userId: data.userId,
+          isOnline: data.isOnline,
+          lastSeen: data.lastSeen
+        });
+      });
+
+      _socket.on("disconnect", function () {
+        console.log("🔴 Socket disconnected");
+      });
+
+      _socket.on("connect_error", function (err) {
+        console.warn("Socket error:", err.message);
+      });
+    },
+
+    // Join a chat room to receive its messages
+    joinRoom: function (roomId) {
+      if (_socket && roomId) {
+        _socket.emit("join", String(roomId));
+      }
+    },
+
+    // Send message via socket (fast — no HTTP round trip)
+    sendMessage: function (roomId, toUserId, text) {
+      if (_socket && _socket.connected) {
+        _socket.emit("message", {
+          roomId: roomId,
+          to: toUserId,
+          text: text
+        });
+        return true; // sent via socket
+      }
+      return false; // fallback to HTTP
+    },
+
+    disconnect: function () {
+      if (_socket) {
+        _socket.disconnect();
+        _socket = null;
+      }
+    }
   };
 })();
