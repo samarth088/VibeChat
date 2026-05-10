@@ -1,78 +1,71 @@
+// js/pages/settings.js
+// Settings page — Change Password handler
+
 document.addEventListener("DOMContentLoaded", function () {
-  var form = document.getElementById("loginForm");
-  var errorBox = document.getElementById("loginError");
-  var submitBtn = form ? form.querySelector('button[type="submit"]') : null;
 
-  if (!form) return;
+  // ■■ Change Password Form ■■
+  var cpForm = document.getElementById("changePasswordForm");
+  if (cpForm) {
+    cpForm.addEventListener("submit", async function (e) {
+      e.preventDefault();
 
-  form.addEventListener("submit", async function (e) {
-    e.preventDefault();
+      var currentPass = document.getElementById("currentPassword").value.trim();
+      var newPass     = document.getElementById("newPassword").value.trim();
+      var confirmPass = document.getElementById("confirmPassword").value.trim();
+      var msgEl       = document.getElementById("passwordMsg");
 
-    errorBox.textContent = "";
-    errorBox.classList.add("hidden");
+      // Reset message
+      msgEl.textContent = "";
+      msgEl.style.color = "";
 
-    var formData = new FormData(form);
-    var identifier = (formData.get("identifier") || "").trim();
-    var password = formData.get("password") || "";
+      // Frontend validation
+      if (!currentPass || !newPass || !confirmPass) {
+        msgEl.textContent = "Saare fields fill karo";
+        msgEl.style.color = "var(--err, #ff5060)";
+        return;
+      }
+      if (newPass !== confirmPass) {
+        msgEl.textContent = "Naya password aur confirm password match nahi kar rahe";
+        msgEl.style.color = "var(--err, #ff5060)";
+        return;
+      }
+      if (newPass.length < 6) {
+        msgEl.textContent = "Password kam se kam 6 characters ka hona chahiye";
+        msgEl.style.color = "var(--err, #ff5060)";
+        return;
+      }
+      if (currentPass === newPass) {
+        msgEl.textContent = "Naya password purane se alag hona chahiye";
+        msgEl.style.color = "var(--err, #ff5060)";
+        return;
+      }
 
-    if (!identifier || !password) {
-      showError("Please fill in all fields.");
-      return;
-    }
+      var btn = cpForm.querySelector("button[type=submit]");
+      if (btn) { btn.disabled = true; btn.textContent = "Saving..."; }
 
-    if (password.length < 6) {
-      showError("Password must be at least 6 characters.");
-      return;
-    }
+      try {
+        var sess = window.VibeState && window.VibeState.loadSession
+          ? window.VibeState.loadSession()
+          : null;
+        if (!sess || !sess.token) {
+          msgEl.textContent = "Session expire ho gayi, dobara login karo";
+          msgEl.style.color = "var(--err, #ff5060)";
+          return;
+        }
 
-    if (!window.VibeAPI || typeof window.VibeAPI.login !== "function") {
-      showError("Login service not loaded.");
-      return;
-    }
+        await window.VibeAPI.changePassword(currentPass, newPass, sess.token);
 
-    setLoading(true);
+        msgEl.textContent = "✓ Password change ho gaya!";
+        msgEl.style.color = "#22c55e";
+        cpForm.reset();
 
-    try {
-      var response = await window.VibeAPI.login({
-        identifier: identifier,
-        password: password
-      });
-
-      var userData = response.user || {};
-
-      var session = {
-        userId: userData.id || response.userId,
-        uid: userData.uid || "",
-        idFormatted: userData.uid || userData.id || response.userId || "",
-        name: userData.name || "",
-        username: userData.username || userData.email || identifier,
-        email: userData.email || identifier,
-        avatar: userData.avatar || "",
-        bio: userData.bio || "",
-        token: response.token || "",
-        profile: response.profile || {}
-      };
-
-      window.VibeState.saveSession(session);
-
-      setTimeout(function () {
-        window.location.assign("./app.html");
-      }, 50);
-    } catch (err) {
-      setLoading(false);
-      showError(err.message || "Login failed. Please try again.");
-    }
-  });
-
-  function showError(msg) {
-    errorBox.textContent = msg;
-    errorBox.classList.remove("hidden");
+      } catch (err) {
+        msgEl.textContent = err.message || "Kuch error aaya, dobara try karo";
+        msgEl.style.color = "var(--err, #ff5060)";
+      } finally {
+        if (btn) { btn.disabled = false; btn.textContent = "Change Password"; }
+      }
+    });
   }
 
-  function setLoading(on) {
-    if (!submitBtn) return;
-    submitBtn.disabled = on;
-    submitBtn.textContent = on ? "Signing in..." : "Sign in";
-  }
 });
-
