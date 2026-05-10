@@ -44,6 +44,11 @@ app.use(express.json({ limit: "15mb" }));
 app.use(express.urlencoded({ extended: true, limit: "15mb" }));
 
 // ── HEALTH CHECK ──────────────────────────────────────────────
+// Health check — frontend pings this to wake Render.com server
+app.get("/api/health", (req, res) => {
+  res.json({ status: "ok", time: Date.now() });
+});
+
 app.get("/", (req, res) => {
   res.status(200).json({ status: "success", message: "VibeChat Backend Running 🚀" });
 });
