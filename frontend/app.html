@@ -212,7 +212,9 @@
 </div><!-- /.phone -->
 
 <!-- ── Scripts (load order matters) ── -->
-<script src="config/env.js"></script>
+<!-- Socket.io client — real-time messages -->
+  <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+  <script src="config/env.js"></script>
 <script src="js/core/state.js"></script>
 <script src="js/core/api.js"></script>
 <script src="js/core/socket.js"></script>
@@ -227,6 +229,11 @@
 <script src="js/pages/group.js"></script>
 <script src="js/pages/calls.js"></script>
 <script>
+  /* ── Wake server on page load (Render.com free tier sleeps after 15min) ── */
+  if (window.VibeState && typeof window.VibeState.wakeServer === "function") {
+    window.VibeState.wakeServer();
+  }
+
   /* ── Clock ── */
   (function tickClock() {
     var el = document.getElementById("statusClock");
