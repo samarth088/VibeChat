@@ -74,18 +74,6 @@ body::before {
   }
 }
 
-/* Status bar */
-.status-bar {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 12px 24px 0;
-  color: #ffffff;
-  font-size: 14px;
-  font-weight: 600;
-  flex-shrink: 0;
-}
-
 /* Chhote screens pe status bar thoda adjust */
 @media (max-width: 360px) {
   .status-bar {
