@@ -414,13 +414,50 @@
   /* ══════════════════════════════════
      Load messages
      ══════════════════════════════════ */
+  // Cache key for localStorage
+  function msgCacheKey(roomId) { return "vibe_msgs_" + roomId; }
+
+  // Save messages to localStorage cache
+  function saveMsgCache(roomId, msgs) {
+    try { localStorage.setItem(msgCacheKey(roomId), JSON.stringify(msgs.slice(-50))); } catch(e) {}
+  }
+
+  // Load messages from localStorage cache
+  function loadMsgCache(roomId) {
+    try {
+      var raw = localStorage.getItem(msgCacheKey(roomId));
+      return raw ? JSON.parse(raw) : null;
+    } catch(e) { return null; }
+  }
+
   async function loadMessages(roomId) {
     try {
       var sess = getSession();
       if (!sess || !sess.token || !roomId) return;
 
+      // INSTANT: show cached messages immediately (no delay)
+      var cached = loadMsgCache(roomId);
+      if (cached && cached.length > 0) {
+        msgStore[roomId] = cached;
+        renderMsgs(roomId);
+      } else {
+        // Show loading only if no cache
+        var area = document.getElementById("chatMsgsArea");
+        if (area && msgStore[roomId] && msgStore[roomId].length === 0) {
+          var loadDiv = document.createElement("div");
+          loadDiv.id = "msgLoadingIndicator";
+          loadDiv.style.cssText = "text-align:center;padding:20px;color:rgba(255,255,255,0.4);font-size:13px;";
+          loadDiv.textContent = "Loading messages...";
+          area.appendChild(loadDiv);
+        }
+      }
+
+      // Fetch fresh from server in background
       var messages = await window.VibeAPI.getMessages(roomId, sess.token);
       var myId     = String(sess.userId);
+
+      var loadingEl = document.getElementById("msgLoadingIndicator");
+      if (loadingEl) loadingEl.remove();
 
       msgStore[roomId] = messages.map(function (m) {
         var senderId =
@@ -437,11 +474,16 @@
         };
       });
 
+      // Save fresh data to cache
+      saveMsgCache(roomId, msgStore[roomId]);
+
       renderMsgs(roomId);
       await markSeen(roomId);
       await refreshDMList();
     } catch (e) {
       console.error("Load messages error:", e);
+      var loadingEl2 = document.getElementById("msgLoadingIndicator");
+      if (loadingEl2) loadingEl2.remove();
     }
   }
 
@@ -526,6 +568,10 @@
     if (btn) { btn.disabled = true; btn.style.opacity = "0.7"; }
 
     try {
+      // Try socket first (instant) — fallback to HTTP
+      var toUserId = userObj && (userObj.userId || userObj._id || userObj.id);
+      var sentViaSocket = window.VibeSocket && window.VibeSocket.sendMessage(roomId, toUserId, text);
+
       var data = await window.VibeAPI.sendMessage(roomId, text, sess.token);
       var m    = data.message || {};
 
@@ -546,6 +592,7 @@
         };
       });
 
+      saveMsgCache(roomId, msgStore[roomId]);
       updateChatListItem(roomId, userObj, m.content || text, m.createdAt || nowIso);
       renderMsgs(roomId);
       await refreshDMList();
@@ -699,7 +746,19 @@
      ══════════════════════════════════ */
   document.addEventListener("DOMContentLoaded", async function () {
     var sess = getSession();
+
+    // Extra fallback — try direct localStorage read if VibeState returns null
     if (!sess) {
+      try {
+        var raw = localStorage.getItem("vibe_session_v1");
+        if (raw) {
+          var parsed = JSON.parse(raw);
+          if (parsed && parsed.token) sess = parsed;
+        }
+      } catch(e) {}
+    }
+
+    if (!sess || !sess.token) {
       window.location.replace("./index.html");
       return;
     }
