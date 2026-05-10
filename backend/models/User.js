@@ -3,7 +3,7 @@ const crypto = require("crypto");
 
 // Game-style UID: VIBE-4729
 function generateUID() {
-  const num = Math.floor(10000 + Math.random() * 90000); // 5-digit: 10000-99999
+  const num = Math.floor(10000 + Math.random() * 90000);
   return "VIBE-" + num;
 }
 
@@ -15,13 +15,11 @@ const userSchema = new mongoose.Schema(
       index: true,
       default: generateUID
     },
-
     name: {
       type: String,
       required: true,
       trim: true
     },
-
     username: {
       type: String,
       unique: true,
@@ -31,7 +29,6 @@ const userSchema = new mongoose.Schema(
       index: true,
       default: null
     },
-
     email: {
       type: String,
       required: true,
@@ -39,44 +36,37 @@ const userSchema = new mongoose.Schema(
       lowercase: true,
       trim: true
     },
-
     password: {
       type: String,
       required: true,
-      minlength: 6
+      minlength: 6,
+      select: false  // ← Security: password queries mein automatically nahi aayega
     },
-
     avatar: {
       type: String,
       default: ""
     },
-
     bio: {
       type: String,
       default: ""
     },
-
     isVerified: {
       type: Boolean,
       default: false
     },
-
     status: {
       type: String,
       enum: ["online", "offline", "away"],
       default: "offline"
     },
-
     isOnline: {
       type: Boolean,
       default: false
     },
-
     socketId: {
       type: String,
       default: null
     },
-
     lastSeen: {
       type: Date,
       default: null
@@ -89,16 +79,12 @@ userSchema.pre("validate", function (next) {
   if (!this.uid) {
     this.uid = generateUID();
   }
-
   if (this.username) {
     this.username = String(this.username).trim().toLowerCase();
   }
-
   if (this.avatar == null) this.avatar = "";
   if (this.bio == null) this.bio = "";
-
   next();
 });
 
 module.exports = mongoose.models.User || mongoose.model("User", userSchema);
-
