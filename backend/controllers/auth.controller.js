@@ -167,7 +167,7 @@ async function _createAccount({ emailLower, fullname, username, password, res })
       finalUsername = baseUsername + Math.floor(1000 + Math.random() * 9000);
     }
 
-    const hashedPassword = await bcrypt.hash(password, 12);
+    const hashedPassword = await bcrypt.hash(password, 10);
 
     const user = await User.create({
       name:       fullname,
