@@ -22,9 +22,11 @@
     },
 
     saveSession: function (sessionObj) {
+      // Keep original createdAt if already set (don't reset 7-day timer on re-save)
+      const existing = window.VibeState.session || {};
       const payload = {
         ...sessionObj,
-        createdAt: Date.now()
+        createdAt: existing.createdAt || Date.now()
       };
 
       window.VibeState.session = payload;
@@ -34,6 +36,16 @@
       } catch (e) {
         console.warn("saveSession: localStorage write failed", e);
       }
+    },
+
+    // Ping server so Render.com free server wakes up before user tries to login
+    wakeServer: function () {
+      try {
+        var cfg = window.ENV || {};
+        var url = String(cfg.API_URL || "").replace(/\/+$/, "");
+        if (!url) return;
+        fetch(url + "/health", { method: "GET" }).catch(function () {});
+      } catch(e) {}
     },
 
     loadSession: function () {
