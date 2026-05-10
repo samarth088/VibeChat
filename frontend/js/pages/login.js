@@ -58,9 +58,19 @@ document.addEventListener("DOMContentLoaded", function () {
 
       window.VibeState.saveSession(session);
 
-      setTimeout(function () {
-        window.location.assign("./app.html");
-      }, 50);
+      // Verify session actually saved before redirecting
+      var check = window.VibeState.loadSession();
+      if (!check || !check.token) {
+        // Fallback: save directly to localStorage
+        try {
+          localStorage.setItem("vibe_session_v1", JSON.stringify({
+            ...session,
+            createdAt: Date.now()
+          }));
+        } catch(e) {}
+      }
+
+      window.location.assign("./app.html");
 
     } catch (err) {
       setLoading(false);
