@@ -1,53 +1,51 @@
 // socket/chat.socket.js
-
 // Real-time DM messaging — send, deliver, read receipts
 
 const Message = require("../models/Message");
-const Chat    = require("../models/Chat");
+const Chat = require("../models/Chat");
 
 const handleChatSocket = (io, socket, onlineUsers) => {
 
-  // ── Send Message ──────────────────────────────────────────────
+  // ■■ Send Message ■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■
   socket.on("message", async ({ roomId, to, text }) => {
     try {
       if (!roomId || !to || !String(text || "").trim()) return;
-
       const senderId = socket.data && socket.data.userId;
       if (!senderId) return;
-
       const content = String(text).trim();
 
-      // Save to DB
-      const message = await Message.create({
-        chat:    roomId,
-        sender:  senderId,
+      // ■ FIX: Save + populate in ONE query (pehle 2 DB calls the, ab 1 hai)
+      const message = new Message({
+        chat: roomId,
+        sender: senderId,
         receiver: to,
         content,
-        status:  "sent"
+        status: "sent"
       });
+      await message.save();
 
-      // Update chat metadata
-      await Chat.findByIdAndUpdate(roomId, {
-        lastMessage:   message._id,
+      // Populate in place — extra findById query hataya
+      await message.populate("sender", "_id username name avatar");
+      await message.populate("receiver", "_id username name avatar");
+
+      // Update chat metadata (parallel — await nahi)
+      Chat.findByIdAndUpdate(roomId, {
+        lastMessage: message._id,
         lastMessageAt: message.createdAt,
-        updatedAt:     new Date()
-      });
-
-      const populatedMsg = await Message.findById(message._id)
-        .populate("sender",   "_id username name avatar")
-        .populate("receiver", "_id username name avatar");
+        updatedAt: new Date()
+      }).catch(err => console.error("Chat update error:", err));
 
       const payload = {
-        _id:       populatedMsg._id,
+        _id: message._id,
         roomId,
-        sender:    populatedMsg.sender,
-        receiver:  populatedMsg.receiver,
-        content:   populatedMsg.content,
-        status:    populatedMsg.status,
-        createdAt: populatedMsg.createdAt
+        sender: message.sender,
+        receiver: message.receiver,
+        content: message.content,
+        status: message.status,
+        createdAt: message.createdAt
       };
 
-      // Send to sender room (optimistic confirm)
+      // Send to sender (optimistic confirm)
       socket.emit("message", payload);
 
       // Send to receiver if online
@@ -56,8 +54,9 @@ const handleChatSocket = (io, socket, onlineUsers) => {
         io.to(receiverSocketId).emit("message", payload);
 
         // Mark as delivered since receiver is online
-        await Message.findByIdAndUpdate(message._id, { status: "delivered" });
-        const deliveredPayload = { ...payload, status: "delivered" };
+        Message.findByIdAndUpdate(message._id, { status: "delivered" })
+          .catch(err => console.error("Deliver update error:", err));
+
         socket.emit("message:status", { msgId: message._id, status: "delivered" });
         io.to(receiverSocketId).emit("message:status", { msgId: message._id, status: "delivered" });
       }
@@ -67,7 +66,7 @@ const handleChatSocket = (io, socket, onlineUsers) => {
     }
   });
 
-  // ── Mark as Read (blue ticks) ─────────────────────────────────
+  // ■■ Mark as Read (blue ticks) ■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■
   socket.on("message:seen", async ({ roomId, by }) => {
     try {
       if (!roomId || !by) return;
@@ -75,9 +74,9 @@ const handleChatSocket = (io, socket, onlineUsers) => {
       // Update all unread messages in this chat to "read"
       const updated = await Message.updateMany(
         {
-          chat:     roomId,
+          chat: roomId,
           receiver: by,
-          status:   { $in: ["sent", "delivered"] }
+          status: { $in: ["sent", "delivered"] }
         },
         {
           $set: { status: "read", seenAt: new Date() }
@@ -88,7 +87,6 @@ const handleChatSocket = (io, socket, onlineUsers) => {
         // Tell sender that messages were read
         io.to(roomId).emit("message:seen", { roomId, by });
       }
-
     } catch (err) {
       console.error("socket message:seen error:", err);
     }
