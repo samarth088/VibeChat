@@ -42,6 +42,20 @@
         if (!raw) return null;
 
         const parsed = JSON.parse(raw);
+
+        // Session 7 din tak valid — uske baad login maango
+        const SEVEN_DAYS = 7 * 24 * 60 * 60 * 1000;
+        if (parsed.createdAt && (Date.now() - parsed.createdAt) > SEVEN_DAYS) {
+          localStorage.removeItem(STORAGE_KEY);
+          return null;
+        }
+
+        // Token missing ho to bhi invalid
+        if (!parsed.token) {
+          localStorage.removeItem(STORAGE_KEY);
+          return null;
+        }
+
         window.VibeState.session = parsed;
         return parsed;
       } catch (e) {
