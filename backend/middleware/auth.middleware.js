@@ -1,5 +1,8 @@
 // middleware/auth.middleware.js
-const jwt = require("jsonwebtoken");
+// FIX: "Bearer eyJ..." se "Bearer " properly strip hota hai
+//      Pehle poori string verify hoti thi → jwt.verify fail → 401
+
+const jwt  = require("jsonwebtoken");
 const User = require("../models/User");
 
 const protect = async (req, res, next) => {
@@ -7,32 +10,45 @@ const protect = async (req, res, next) => {
     const authHeader = req.headers.authorization;
 
     if (!authHeader) {
-      return res.status(401).json({ success: false, error: "Unauthorized. No token." });
+      return res.status(401).json({
+        success: false,
+        error: "Unauthorized. No token provided."
+      });
     }
 
-    // ✅ FIX: "Bearer eyJ..." se "Bearer " strip karo
-    // Pehle poori string verify hoti thi → jwt.verify fail → 401
+    // Strip "Bearer " prefix if present
     let token = authHeader;
     if (authHeader.startsWith("Bearer ")) {
-      token = authHeader.slice(7);
+      token = authHeader.slice(7).trim();
+    }
+
+    if (!token) {
+      return res.status(401).json({
+        success: false,
+        error: "Unauthorized. Token is empty."
+      });
     }
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
     const user = await User.findById(decoded.id).select("-password");
-
     if (!user) {
-      return res.status(401).json({ success: false, error: "User not found" });
+      return res.status(401).json({
+        success: false,
+        error: "User not found. Token may be stale."
+      });
     }
 
     req.user = user;
     next();
 
   } catch (err) {
-    return res.status(401).json({ success: false, error: "Invalid or expired token" });
+    return res.status(401).json({
+      success: false,
+      error: "Invalid or expired token. Please login again."
+    });
   }
 };
 
-// ✅ Named export "protect" — user.routes.js mein { protect } se import hota hai
+// Named export — routes use { protect }
 module.exports = { protect };
-
