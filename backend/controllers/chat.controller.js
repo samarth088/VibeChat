@@ -1,4 +1,5 @@
 // controllers/chat.controller.js
+// FIX: createOrGetChat body mein { userId } expected hai — frontend api.js se match karta hai
 
 const Chat    = require("../models/Chat");
 const Message = require("../models/Message");
@@ -22,22 +23,23 @@ function mapSet(chatDoc, key, value) {
   }
 }
 
-
-// ── CREATE OR GET CHAT ────────────────────────────────────────
+// ── CREATE OR GET CHAT ────────────────────────────────────────────
+// FIX: frontend sends { userId } in body — confirmed in api.js openOrCreateChat
 exports.createOrGetChat = async (req, res, next) => {
   try {
     const currentUserId = req.user._id;
-    const otherUserId   = req.body.userId;
+    const otherUserId   = req.body.userId;   // FIX: was req.body.otherUserId in socket.js
 
     if (!otherUserId) {
-      return res.status(400).json({ success: false, message: "User ID required" });
+      return res.status(400).json({ success: false, message: "userId required in body" });
     }
-
     if (sameId(currentUserId, otherUserId)) {
       return res.status(400).json({ success: false, message: "Cannot chat with yourself" });
     }
 
-    let chat = await Chat.findOne({ members: { $all: [currentUserId, otherUserId] } });
+    let chat = await Chat.findOne({
+      members: { $all: [currentUserId, otherUserId] }
+    });
 
     if (!chat) {
       chat = await Chat.create({
@@ -56,8 +58,7 @@ exports.createOrGetChat = async (req, res, next) => {
   }
 };
 
-
-// ── GET USER CHATS ────────────────────────────────────────────
+// ── GET USER CHATS ────────────────────────────────────────────────
 exports.getUserChats = async (req, res, next) => {
   try {
     const currentUserId = req.user._id;
@@ -71,7 +72,7 @@ exports.getUserChats = async (req, res, next) => {
       const otherUser = chat.members.find(m => !sameId(m._id, currentUserId));
       return {
         _id:         chat._id,
-        user:        otherUser,
+        user:        otherUser,          // includes uid field from populate
         lastMessage: chat.lastMessage,
         unreadCount: mapGet(chat.unreadCounts, currentUserId),
         updatedAt:   chat.updatedAt
@@ -85,15 +86,13 @@ exports.getUserChats = async (req, res, next) => {
   }
 };
 
-
-// ── GET CHAT MESSAGES ─────────────────────────────────────────
+// ── GET CHAT MESSAGES ─────────────────────────────────────────────
 exports.getChatMessages = async (req, res, next) => {
   try {
     const currentUserId = req.user._id;
     const chatId        = req.params.chatId;
 
     const chat = await Chat.findById(chatId);
-
     if (!chat || !chat.members.some(id => sameId(id, currentUserId))) {
       return res.status(403).json({ success: false, message: "Access denied" });
     }
@@ -110,8 +109,7 @@ exports.getChatMessages = async (req, res, next) => {
   }
 };
 
-
-// ── SEND MESSAGE ──────────────────────────────────────────────
+// ── SEND MESSAGE ──────────────────────────────────────────────────
 exports.sendMessage = async (req, res, next) => {
   try {
     const currentUserId = req.user._id;
@@ -123,7 +121,6 @@ exports.sendMessage = async (req, res, next) => {
     }
 
     const chat = await Chat.findById(chatId);
-
     if (!chat || !chat.members.some(id => sameId(id, currentUserId))) {
       return res.status(403).json({ success: false, message: "Not allowed" });
     }
@@ -154,29 +151,20 @@ exports.sendMessage = async (req, res, next) => {
   }
 };
 
-
-// ── MARK CHAT AS SEEN (blue ticks) ───────────────────────────
+// ── MARK CHAT AS SEEN (blue ticks) ───────────────────────────────
 exports.markChatSeen = async (req, res, next) => {
   try {
     const currentUserId = req.user._id;
     const chatId        = req.params.chatId;
 
     const chat = await Chat.findById(chatId);
-
     if (!chat || !chat.members.some(id => sameId(id, currentUserId))) {
       return res.status(403).json({ success: false, message: "Access denied" });
     }
 
-    // FIX: was "seen" — correct enum value is "read"
     await Message.updateMany(
-      {
-        chat:     chatId,
-        receiver: currentUserId,
-        status:   { $in: ["sent", "delivered"] }
-      },
-      {
-        $set: { status: "read", seenAt: new Date() }
-      }
+      { chat: chatId, receiver: currentUserId, status: { $in: ["sent", "delivered"] } },
+      { $set: { status: "read", seenAt: new Date() } }
     );
 
     mapSet(chat, currentUserId, 0);
