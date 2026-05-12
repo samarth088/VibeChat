@@ -1,8 +1,9 @@
 // js/pages/chat.js
-
 // VibeChat — DM list + chat window
-// Features: profile display, new-msg-on-top, last seen, avatar in header,
-//           real-time socket, read receipts, optimistic send
+// FIX 1: openChatFromSearch — name field properly pass hota hai
+// FIX 2: normalizeChat — uid properly map hota hai
+// FIX 3: Socket message handler — message:status event handle hota hai
+// FIX 4: markSeen socket event bhi emit hota hai
 
 (function () {
   function qid(id)  { return document.getElementById(id); }
@@ -11,21 +12,18 @@
 
   function esc(t) {
     return String(t || "")
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;");
+      .replace(/&/g,  "&amp;")
+      .replace(/</g,  "&lt;")
+      .replace(/>/g,  "&gt;");
   }
   function escAttr(t) {
     return String(t || "")
-      .replace(/&/g, "&amp;")
-      .replace(/"/g, "&quot;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;");
+      .replace(/&/g,  "&amp;")
+      .replace(/"/g,  "&quot;")
+      .replace(/</g,  "&lt;")
+      .replace(/>/g,  "&gt;");
   }
 
-  function nowTime() {
-    return new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-  }
   function formatTime(date) {
     if (!date) return "";
     var d = new Date(date);
@@ -33,31 +31,33 @@
     return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
   }
 
-  // Feature 9: Last seen relative time
+  function nowTime() {
+    return new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  }
+
+  // Last seen relative time
   function timeAgoText(date) {
     if (!date) return "Offline";
     var d = new Date(date);
     if (isNaN(d.getTime())) return "Offline";
-
-    var diffSec = Math.max(0, Math.floor((Date.now() - d.getTime()) / 1000));
-    if (diffSec < 60)    return "Last seen just now";
-    if (diffSec < 3600)  return "Last seen " + Math.floor(diffSec / 60) + " min" + (Math.floor(diffSec / 60) > 1 ? "s" : "") + " ago";
-    if (diffSec < 86400) return "Last seen " + Math.floor(diffSec / 3600) + " hour" + (Math.floor(diffSec / 3600) > 1 ? "s" : "") + " ago";
+    var diff = Math.max(0, Math.floor((Date.now() - d.getTime()) / 1000));
+    if (diff < 60)    return "Last seen just now";
+    if (diff < 3600)  return "Last seen " + Math.floor(diff / 60) + " min" + (Math.floor(diff / 60) > 1 ? "s" : "") + " ago";
+    if (diff < 86400) return "Last seen " + Math.floor(diff / 3600) + " hr" + (Math.floor(diff / 3600) > 1 ? "s" : "") + " ago";
     return "Last seen " + d.toLocaleString([], { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" });
   }
 
   function getSession() {
     return window.VibeState && window.VibeState.loadSession
-      ? window.VibeState.loadSession()
-      : null;
+      ? window.VibeState.loadSession() : null;
   }
+
   function saveSessionSafe(sess) {
     if (window.VibeState && typeof window.VibeState.saveSession === "function") {
       window.VibeState.saveSession(sess);
     }
   }
 
-  // Feature 3: Sort chats — newest message first
   function sortChatsByLatest(list) {
     return (list || []).slice().sort(function (a, b) {
       var ta = a && a.time ? new Date(a.time).getTime() : 0;
@@ -66,54 +66,48 @@
     });
   }
 
-  var msgStore      = {};  // roomId → array of msg objects
-  var chatMeta      = {};  // roomId → chat info
+  var msgStore      = {}; // roomId → array of msg objects
+  var chatMeta      = {}; // roomId → chat info
   var currentRoomId = null;
   var currentChatUser = null;
 
-  /* ══════════════════════════════════
-     Feature 1+2+5+6+7+8: Render profile
-     ══════════════════════════════════ */
+  // ── Render profile in profile sheet ────────────────────────────
   function renderProfile(sess) {
     qsa(".profile-name").forEach(function (el) {
       el.textContent = sess.name || sess.username || "Your Name";
     });
-
     qsa(".profile-uid").forEach(function (el) {
-      var idText = sess.uid || sess.idFormatted ||
-        (window.VibeState && window.VibeState.formatId
-          ? window.VibeState.formatId(sess.userId)
-          : (sess.userId || ""));
+      var idText = sess.uid || sess.idFormatted || "";
       el.textContent =
-        (sess.username ? "@" + sess.username + " · " : "") + "ID: " + idText;
+        (sess.username ? "@" + sess.username + " · " : "") +
+        (idText ? "ID: " + idText : "");
     });
-
     qsa(".profile-bio").forEach(function (el) {
-      el.textContent = sess.bio || "🚀 Add your bio";
+      el.textContent = sess.bio || "✨ Add your bio";
     });
 
-    // Feature 1: Profile Picture — avatar in profile sheet
     var av = qs(".profile-avatar-big");
     if (av) {
       if (sess.avatar) {
         av.innerHTML =
-          '<img src="' + escAttr(sess.avatar) +
-          '" alt="avatar" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">';
+          '<img src="' + escAttr(sess.avatar) + '" alt="avatar" ' +
+          'style="width:100%;height:100%;object-fit:cover;border-radius:50%;">';
       } else {
         av.textContent = (sess.username || sess.name || "Y").charAt(0).toUpperCase();
       }
     }
+
+    // Stat: number of chats
+    var statChats = qid("statChats");
+    if (statChats) statChats.textContent = Object.keys(chatMeta).length || "0";
   }
 
-  /* ══════════════════════════════════
-     Fetch chats from backend
-     ══════════════════════════════════ */
+  // ── Fetch chats from backend ────────────────────────────────────
   async function fetchChats() {
     var sess = getSession();
     if (!sess || !sess.token) return [];
     try {
-      var list = await window.VibeAPI.getChats(sess.token);
-      return list;
+      return await window.VibeAPI.getChats(sess.token);
     } catch (e) {
       console.error("fetchChats error:", e);
       return [];
@@ -124,101 +118,97 @@
     var sess = getSession();
     var me   = String((sess && sess.userId) || "");
 
-    var participants = raw.participants || raw.members || [];
-    var otherUser    = raw.otherUser || raw.user || raw.participant || null;
-
-    if (!otherUser && Array.isArray(participants)) {
-      otherUser = participants.find(function (p) {
-        return String(p._id || p.id || p.userId || "") !== me;
+    var otherUser = raw.user || raw.otherUser || null;
+    if (!otherUser) {
+      var members = raw.members || raw.participants || [];
+      otherUser = members.find(function (p) {
+        return String(p._id || p.id || "") !== me;
       }) || null;
     }
 
     var chatId   = raw._id || raw.id || raw.chatId || raw.roomId;
-    var userId   = otherUser ? (otherUser._id || otherUser.id || otherUser.userId) : null;
+    var userId   = otherUser ? String(otherUser._id || otherUser.id || "") : "";
     var username = otherUser ? (otherUser.username || otherUser.name || "User") : "User";
 
-    var unreadMap = raw.unreadCounts || {};
-    var myUnread  = 0;
+    // FIX: unreadCounts Map handling
+    var myUnread = 0;
     try {
-      myUnread = Number(unreadMap[me] || raw.unreadCount || 0);
-    } catch (e) {
-      myUnread = Number(raw.unreadCount || 0);
-    }
+      var uc = raw.unreadCounts || {};
+      myUnread = Number(
+        typeof uc.get === "function" ? uc.get(me) :
+        (uc[me] !== undefined ? uc[me] : (raw.unreadCount || 0))
+      ) || 0;
+    } catch (_) { myUnread = Number(raw.unreadCount || 0); }
 
     return {
-      roomId:      String(chatId  || ""),
-      userId:      String(userId  || ""),
-      username:    username,
-      name:        otherUser ? (otherUser.name || username) : username,
-      avatar:      otherUser ? (otherUser.avatar    || "") : "",
-      bio:         otherUser ? (otherUser.bio        || "") : "",
-      isOnline:    !!(otherUser && otherUser.isOnline),
-      lastSeenAt:  otherUser ? (otherUser.lastSeen || otherUser.lastSeenAt || null) : null,
+      roomId:     String(chatId || ""),
+      userId:     userId,
+      username:   username,
+      name:       otherUser ? (otherUser.name || username) : username,
+      uid:        otherUser ? (otherUser.uid || "") : "",   // FIX: uid preserve karo
+      avatar:     otherUser ? (otherUser.avatar || "") : "",
+      bio:        otherUser ? (otherUser.bio || "") : "",
+      isOnline:   !!(otherUser && otherUser.isOnline),
+      lastSeenAt: otherUser ? (otherUser.lastSeen || null) : null,
       unreadCount: myUnread,
       preview:
         (raw.lastMessage && (raw.lastMessage.content || raw.lastMessage.text)) ||
         raw.preview || "Tap to chat",
       time:
-        (raw.lastMessage && (raw.lastMessage.createdAt || raw.lastMessage.updatedAt)) ||
+        (raw.lastMessage && raw.lastMessage.createdAt) ||
         raw.updatedAt || raw.createdAt || null
     };
   }
 
-  /* ══════════════════════════════════
-     Avatar HTML helpers
-     ══════════════════════════════════ */
-  // Feature 1: Profile picture in DM list
-  function getAvatarHtml(chat, size) {
-    size = size || 46;
+  // ── Avatar HTML helpers ─────────────────────────────────────────
+  function getAvatarHtml(chat) {
     if (chat.avatar) {
       return (
         '<div class="avatar">' +
-          '<img src="' + escAttr(chat.avatar) +
-          '" alt="avatar" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">' +
+        '<img src="' + escAttr(chat.avatar) + '" alt="avatar" ' +
+        'style="width:100%;height:100%;object-fit:cover;border-radius:50%;">' +
         "</div>"
       );
     }
     return (
       '<div class="avatar">' +
-        esc((chat.username || chat.name || "U").charAt(0).toUpperCase()) +
+      esc((chat.username || chat.name || "U").charAt(0).toUpperCase()) +
       "</div>"
     );
   }
 
-  // Feature 1: Avatar in chat header
   function getHeaderAvatar(userObj) {
-    if (userObj.avatar) {
+    if (userObj && userObj.avatar) {
       return (
         '<div style="width:42px;height:42px;border-radius:50%;overflow:hidden;' +
-          'border:2px solid rgba(0,100,220,0.4);flex-shrink:0;">' +
-          '<img src="' + escAttr(userObj.avatar) +
-          '" alt="avatar" style="width:100%;height:100%;object-fit:cover;">' +
+        'border:2px solid rgba(0,100,220,0.4);flex-shrink:0;">' +
+        '<img src="' + escAttr(userObj.avatar) + '" alt="avatar" ' +
+        'style="width:100%;height:100%;object-fit:cover;">' +
         "</div>"
       );
     }
     return (
-      '<div style="width:42px;height:42px;border-radius:50%;background:linear-gradient(135deg,#1a3a6a,#0d1f3c);' +
-        'border:2px solid rgba(0,100,220,0.4);display:flex;align-items:center;justify-content:center;' +
-        'font-size:18px;font-weight:700;color:#4db8ff;flex-shrink:0;">' +
-        esc((userObj.username || userObj.name || "U").charAt(0).toUpperCase()) +
+      '<div style="width:42px;height:42px;border-radius:50%;' +
+      'background:linear-gradient(135deg,#1a3a6a,#0d1f3c);' +
+      'border:2px solid rgba(0,100,220,0.4);display:flex;align-items:center;' +
+      'justify-content:center;font-size:18px;font-weight:700;color:#4db8ff;flex-shrink:0;">' +
+      esc(((userObj && (userObj.username || userObj.name)) || "U").charAt(0).toUpperCase()) +
       "</div>"
     );
   }
 
-  /* ══════════════════════════════════
-     Feature 3: Render DM list (newest on top)
-     ══════════════════════════════════ */
+  // ── Render DM list ──────────────────────────────────────────────
   function renderDMList(chats) {
     var dmList = qid("dmContent");
     if (!dmList) return;
-
     dmList.innerHTML = "";
-    chats = sortChatsByLatest(chats);   // newest message first
+
+    chats = sortChatsByLatest(chats);
 
     if (!chats.length) {
       dmList.innerHTML =
         '<div style="padding:24px 18px;color:rgba(255,255,255,0.55);text-align:center;">' +
-        'No chats yet. Search a user and say hello! 👋</div>';
+        "No chats yet. Search a user and say hello! 💬</div>";
       return;
     }
 
@@ -233,7 +223,9 @@
       item.innerHTML =
         '<div class="avatar-wrap">' +
           getAvatarHtml(chat) +
-          (chat.unreadCount > 0 ? '<div class="unread-badge">' + chat.unreadCount + "</div>" : "") +
+          (chat.unreadCount > 0
+            ? '<div class="unread-badge">' + chat.unreadCount + "</div>"
+            : "") +
         "</div>" +
         '<div class="conv-info">' +
           '<div class="conv-name">' + esc(chat.name || chat.username) + "</div>" +
@@ -241,10 +233,14 @@
         "</div>" +
         '<div class="conv-meta">' +
           '<div style="display:flex;align-items:center;gap:5px;">' +
-            '<span class="conv-time">' + esc(chat.time ? formatTime(chat.time) : "Now") + "</span>" +
+            '<span class="conv-time">' +
+              esc(chat.time ? formatTime(chat.time) : "") +
+            "</span>" +
             (chat.isOnline ? '<div class="online-dot"></div>' : "") +
           "</div>" +
-          (chat.unreadCount > 0 ? '<div class="unread-count">' + chat.unreadCount + "</div>" : "") +
+          (chat.unreadCount > 0
+            ? '<div class="unread-count">' + chat.unreadCount + "</div>"
+            : "") +
         "</div>";
 
       item.addEventListener("click", function () {
@@ -252,6 +248,7 @@
           userId:     chat.userId,
           username:   chat.username,
           name:       chat.name,
+          uid:        chat.uid,
           avatar:     chat.avatar,
           bio:        chat.bio,
           isOnline:   chat.isOnline,
@@ -261,6 +258,10 @@
 
       dmList.appendChild(item);
     });
+
+    // Update stat
+    var statChats = qid("statChats");
+    if (statChats) statChats.textContent = chats.length;
   }
 
   async function refreshDMList() {
@@ -269,44 +270,40 @@
     renderDMList(chats);
   }
 
-  /* ══════════════════════════════════
-     Mark messages seen
-     ══════════════════════════════════ */
+  // ── Mark seen ───────────────────────────────────────────────────
   async function markSeen(roomId) {
     var sess = getSession();
     if (!sess || !sess.token || !roomId) return;
     try {
       await window.VibeAPI.markSeen(roomId, sess.token);
-    } catch (e) { /* silent */ }
+      // Also emit via socket
+      if (window.VibeSocket && window.VibeSocket.markSeen) {
+        window.VibeSocket.markSeen(roomId, sess.userId);
+      }
+    } catch (_) {}
   }
 
-  /* ══════════════════════════════════
-     Feature 9: Online / Last seen status
-     ══════════════════════════════════ */
+  // ── Online / last seen status ────────────────────────────────────
   function renderUserStatus(userObj) {
     var statusEl = qid("chatUserStatus");
     if (!statusEl) return;
     if (userObj && userObj.isOnline) {
-      statusEl.textContent = "● Online";
-      statusEl.style.color = "#2ee67e";
+      statusEl.textContent  = "● Online";
+      statusEl.style.color  = "#2ee67e";
     } else {
-      statusEl.textContent = timeAgoText(userObj && userObj.lastSeenAt);
-      statusEl.style.color = "rgba(255,255,255,0.55)";
+      statusEl.textContent  = timeAgoText(userObj && userObj.lastSeenAt);
+      statusEl.style.color  = "rgba(255,255,255,0.55)";
     }
   }
 
-  /* ══════════════════════════════════
-     Feature 3: Move chat to top on new msg
-     ══════════════════════════════════ */
+  // ── Move chat to top on new msg ──────────────────────────────────
   function updateChatListItem(roomId, userObj, text, createdAt) {
     if (!roomId) return;
-
     chatMeta[roomId] = chatMeta[roomId] || {};
-    chatMeta[roomId].preview  = text || "";
-    chatMeta[roomId].time     = createdAt || new Date().toISOString();
-
+    chatMeta[roomId].preview = text || "";
+    chatMeta[roomId].time    = createdAt || new Date().toISOString();
     if (userObj && typeof userObj.isOnline !== "undefined") {
-      chatMeta[roomId].isOnline = !!userObj.isOnline;
+      chatMeta[roomId].isOnline  = !!userObj.isOnline;
     }
     if (userObj && userObj.lastSeenAt) {
       chatMeta[roomId].lastSeenAt = userObj.lastSeenAt;
@@ -321,13 +318,10 @@
     if (previewEl) previewEl.textContent = text || "";
     if (timeEl)    timeEl.textContent    = formatTime(createdAt || new Date().toISOString());
 
-    // Move to top — newest first
     dmList.insertBefore(item, dmList.firstChild);
   }
 
-  /* ══════════════════════════════════
-     Chat page — open
-     ══════════════════════════════════ */
+  // ── Open chat page ──────────────────────────────────────────────
   function openChatPage(userObj, roomId) {
     var phone = qs(".phone");
     if (!phone || !roomId) return;
@@ -337,55 +331,55 @@
 
     var old = qid("chatPage");
     if (old) old.remove();
+
     if (!msgStore[roomId]) msgStore[roomId] = [];
 
-    var username = esc(userObj.username || userObj.name || "User");
-
+    var username = esc(userObj.name || userObj.username || "User");
     var page = document.createElement("div");
     page.id = "chatPage";
     page.style.cssText =
       "position:absolute;inset:0;z-index:300;display:flex;flex-direction:column;" +
-      "background:linear-gradient(160deg,#000d24 0%,#000510 100%);";
+      "background:linear-gradient(160deg,#000d24 0%,#000510 100%);animation:slideIn 0.2s ease;";
 
     page.innerHTML =
       /* header */
       '<div id="chatPageHeader" style="display:flex;align-items:center;gap:12px;' +
-        'padding:12px 14px;background:rgba(0,8,28,0.96);border-bottom:1px solid rgba(0,100,255,0.2);flex-shrink:0;">' +
+        'padding:12px 14px;background:rgba(0,8,28,0.96);' +
+        'border-bottom:1px solid rgba(0,100,255,0.2);flex-shrink:0;">' +
         '<button id="chatBackBtn" style="background:none;border:none;color:#4db8ff;' +
           'font-size:26px;line-height:1;cursor:pointer;padding:0 6px 0 0;">‹</button>' +
         getHeaderAvatar(userObj) +
         '<div style="flex:1;min-width:0;">' +
-          '<div style="color:#fff;font-size:15px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' +
+          '<div style="color:#fff;font-size:15px;font-weight:700;' +
+            'white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' +
             username +
           "</div>" +
-          // Feature 9: last seen
           '<div style="font-size:11px;margin-top:1px;" id="chatUserStatus"></div>' +
         "</div>" +
       "</div>" +
-
       /* messages area */
       '<div id="chatMsgsArea" style="flex:1;overflow-y:auto;padding:12px 10px;' +
         'display:flex;flex-direction:column;gap:6px;scroll-behavior:smooth;">' +
         '<div style="text-align:center;margin:10px 0 16px;">' +
           '<span style="background:rgba(0,40,100,0.5);color:rgba(255,255,255,0.38);' +
-            'font-size:11px;padding:5px 14px;border-radius:20px;border:1px solid rgba(0,80,180,0.2);">' +
-            '🔒 Messages are end-to-end encrypted' +
-          "</span>" +
+            'font-size:11px;padding:5px 14px;border-radius:20px;' +
+            'border:1px solid rgba(0,80,180,0.2);">🔒 Messages are end-to-end encrypted</span>' +
         "</div>" +
       "</div>" +
-
       /* input bar */
       '<div style="display:flex;align-items:center;gap:8px;padding:10px 12px;' +
         'background:rgba(0,6,20,0.98);border-top:1px solid rgba(0,80,200,0.2);flex-shrink:0;">' +
         '<div style="flex:1;display:flex;align-items:center;background:rgba(0,40,100,0.4);' +
           'border:1.5px solid rgba(0,100,255,0.3);border-radius:24px;padding:0 14px;gap:6px;">' +
           '<input id="chatInput" type="text" placeholder="Message…" ' +
-            'style="flex:1;background:transparent;border:none;outline:none;color:#fff;font-size:14px;padding:11px 0;" />' +
+            'style="flex:1;background:transparent;border:none;outline:none;color:#fff;' +
+            'font-size:14px;padding:11px 0;" autocomplete="off" />' +
         "</div>" +
-        '<button id="chatSendBtn" style="width:44px;height:44px;border-radius:50%;border:none;flex-shrink:0;' +
-          'background:linear-gradient(135deg,#0080ff,#0050cc);cursor:pointer;' +
+        '<button id="chatSendBtn" style="width:44px;height:44px;border-radius:50%;border:none;' +
+          'flex-shrink:0;background:linear-gradient(135deg,#0080ff,#0050cc);cursor:pointer;' +
           'display:flex;align-items:center;justify-content:center;">' +
-          '<svg viewBox="0 0 24 24" width="20" height="20" fill="white"><path d="M2 21l21-9L2 3v7l15 2-15 2v7z"/></svg>' +
+          '<svg viewBox="0 0 24 24" width="20" height="20" fill="white">' +
+            '<path d="M2 21l21-9L2 3v7l15 2-15 2v7z"/></svg>' +
         "</button>" +
       "</div>";
 
@@ -399,9 +393,11 @@
       currentRoomId   = null;
       currentChatUser = null;
     });
+
     qid("chatSendBtn").addEventListener("click", function () {
       sendMessage(roomId, userObj);
     });
+
     qid("chatInput").addEventListener("keydown", function (e) {
       if (e.key === "Enter") { e.preventDefault(); sendMessage(roomId, userObj); }
     });
@@ -411,62 +407,22 @@
     }
   }
 
-  /* ══════════════════════════════════
-     Load messages
-     ══════════════════════════════════ */
-  // Cache key for localStorage
-  function msgCacheKey(roomId) { return "vibe_msgs_" + roomId; }
-
-  // Save messages to localStorage cache
-  function saveMsgCache(roomId, msgs) {
-    try { localStorage.setItem(msgCacheKey(roomId), JSON.stringify(msgs.slice(-50))); } catch(e) {}
-  }
-
-  // Load messages from localStorage cache
-  function loadMsgCache(roomId) {
-    try {
-      var raw = localStorage.getItem(msgCacheKey(roomId));
-      return raw ? JSON.parse(raw) : null;
-    } catch(e) { return null; }
-  }
-
+  // ── Load messages from backend ──────────────────────────────────
   async function loadMessages(roomId) {
     try {
       var sess = getSession();
       if (!sess || !sess.token || !roomId) return;
 
-      // INSTANT: show cached messages immediately (no delay)
-      var cached = loadMsgCache(roomId);
-      if (cached && cached.length > 0) {
-        msgStore[roomId] = cached;
-        renderMsgs(roomId);
-      } else {
-        // Show loading only if no cache
-        var area = document.getElementById("chatMsgsArea");
-        if (area && msgStore[roomId] && msgStore[roomId].length === 0) {
-          var loadDiv = document.createElement("div");
-          loadDiv.id = "msgLoadingIndicator";
-          loadDiv.style.cssText = "text-align:center;padding:20px;color:rgba(255,255,255,0.4);font-size:13px;";
-          loadDiv.textContent = "Loading messages...";
-          area.appendChild(loadDiv);
-        }
-      }
-
-      // Fetch fresh from server in background
       var messages = await window.VibeAPI.getMessages(roomId, sess.token);
       var myId     = String(sess.userId);
 
-      var loadingEl = document.getElementById("msgLoadingIndicator");
-      if (loadingEl) loadingEl.remove();
-
       msgStore[roomId] = messages.map(function (m) {
-        var senderId =
-          typeof m.sender === "object"
-            ? String(m.sender._id || m.sender.id || "")
-            : String(m.sender || "");
+        var senderId = typeof m.sender === "object"
+          ? String(m.sender._id || m.sender.id || "")
+          : String(m.sender || "");
         return {
           id:        String(m._id),
-          text:      m.content || "",
+          text:      m.content || m.text || "",
           isMe:      senderId === myId,
           time:      formatTime(m.createdAt),
           status:    m.status || "sent",
@@ -474,22 +430,15 @@
         };
       });
 
-      // Save fresh data to cache
-      saveMsgCache(roomId, msgStore[roomId]);
-
       renderMsgs(roomId);
       await markSeen(roomId);
       await refreshDMList();
     } catch (e) {
-      console.error("Load messages error:", e);
-      var loadingEl2 = document.getElementById("msgLoadingIndicator");
-      if (loadingEl2) loadingEl2.remove();
+      console.error("loadMessages error:", e);
     }
   }
 
-  /* ══════════════════════════════════
-     Render messages
-     ══════════════════════════════════ */
+  // ── Render messages ─────────────────────────────────────────────
   function renderMsgs(roomId) {
     var area = qid("chatMsgsArea");
     if (!area) return;
@@ -497,24 +446,34 @@
     area.querySelectorAll(".msg-row").forEach(function (el) { el.remove(); });
 
     function getTick(status) {
-      if (status === "seen")      return "✓✓";
-      if (status === "sending")   return "⌛";
+      if (status === "read" || status === "seen") return "✓✓";
+      if (status === "sending")   return "⏱";
       if (status === "failed")    return "✗";
       if (status === "delivered") return "✓✓";
       return "✓";
     }
+    function getTickColor(status) {
+      if (status === "read" || status === "seen") return "#00d4ff";
+      return "rgba(100,180,255,0.7)";
+    }
 
     (msgStore[roomId] || []).forEach(function (msg) {
       var row = document.createElement("div");
-      row.className = "msg-row";
-      row.style.cssText = "display:flex;" + (msg.isMe ? "justify-content:flex-end;" : "justify-content:flex-start;");
+      row.className  = "msg-row";
+      row.style.cssText =
+        "display:flex;" +
+        (msg.isMe ? "justify-content:flex-end;" : "justify-content:flex-start;");
 
       row.innerHTML =
         '<div style="' +
           "max-width:75%;min-width:60px;padding:8px 12px 6px;" +
           "border-radius:" + (msg.isMe ? "16px 16px 3px 16px" : "16px 16px 16px 3px") + ";" +
-          "background:" + (msg.isMe ? "linear-gradient(135deg,#0065cc,#0045aa)" : "rgba(255,255,255,0.07)") + ";" +
-          "border:1px solid " + (msg.isMe ? "rgba(0,120,255,0.25)" : "rgba(255,255,255,0.07)") + ";" +
+          "background:" + (msg.isMe
+            ? "linear-gradient(135deg,#0065cc,#0045aa)"
+            : "rgba(255,255,255,0.07)") + ";" +
+          "border:1px solid " + (msg.isMe
+            ? "rgba(0,120,255,0.25)"
+            : "rgba(255,255,255,0.07)") + ";" +
           "color:#fff;font-size:14px;line-height:1.45;word-break:break-word;" +
         '">' +
           "<div>" + esc(msg.text) + "</div>" +
@@ -522,7 +481,7 @@
             'text-align:right;display:flex;align-items:center;justify-content:flex-end;gap:3px;">' +
             esc(msg.time || "") +
             (msg.isMe
-              ? '<span style="color:' + (msg.status === "seen" ? "#00d4ff" : "rgba(100,180,255,0.7)") + ';">' +
+              ? '<span style="color:' + getTickColor(msg.status) + ';">' +
                   esc(getTick(msg.status)) + "</span>"
               : "") +
           "</div>" +
@@ -534,12 +493,10 @@
     area.scrollTop = area.scrollHeight;
   }
 
-  /* ══════════════════════════════════
-     Send message (optimistic)
-     ══════════════════════════════════ */
+  // ── Send message (optimistic) ───────────────────────────────────
   async function sendMessage(roomId, userObj) {
     var input = qid("chatInput");
-    var text  = (input ? input.value : "").trim();
+    var text  = input ? String(input.value || "").trim() : "";
     if (!text) return;
 
     var sess = getSession();
@@ -547,19 +504,14 @@
 
     if (!msgStore[roomId]) msgStore[roomId] = [];
 
-    var tempId = "temp_" + Date.now();
-    var nowIso = new Date().toISOString();
+    var tempId  = "temp_" + Date.now();
+    var nowIso  = new Date().toISOString();
 
-    // Optimistic: show immediately
+    // Optimistic show
     msgStore[roomId].push({
-      id:        tempId,
-      text:      text,
-      isMe:      true,
-      time:      formatTime(nowIso),
-      status:    "sending",
-      createdAt: nowIso
+      id: tempId, text: text, isMe: true,
+      time: formatTime(nowIso), status: "sending", createdAt: nowIso
     });
-
     updateChatListItem(roomId, userObj, text, nowIso);
     if (input) input.value = "";
     renderMsgs(roomId);
@@ -568,20 +520,13 @@
     if (btn) { btn.disabled = true; btn.style.opacity = "0.7"; }
 
     try {
-      // Try socket first (instant) — fallback to HTTP
-      var toUserId = userObj && (userObj.userId || userObj._id || userObj.id);
-      var sentViaSocket = window.VibeSocket && window.VibeSocket.sendMessage(roomId, toUserId, text);
-
       var data = await window.VibeAPI.sendMessage(roomId, text, sess.token);
       var m    = data.message || {};
 
-      // Replace temp with real
       msgStore[roomId] = msgStore[roomId].map(function (msg) {
         if (msg.id !== tempId) return msg;
-        var senderId =
-          typeof m.sender === "object"
-            ? String(m.sender._id || m.sender.id || "")
-            : String(m.sender || "");
+        var senderId = typeof m.sender === "object"
+          ? String(m.sender._id || m.sender.id || "") : String(m.sender || "");
         return {
           id:        String(m._id || tempId),
           text:      m.content || text,
@@ -592,17 +537,14 @@
         };
       });
 
-      saveMsgCache(roomId, msgStore[roomId]);
       updateChatListItem(roomId, userObj, m.content || text, m.createdAt || nowIso);
       renderMsgs(roomId);
       await refreshDMList();
 
     } catch (err) {
-      console.error("Send message error:", err);
-      // Mark as failed
+      console.error("sendMessage error:", err);
       msgStore[roomId] = msgStore[roomId].map(function (msg) {
-        if (msg.id !== tempId) return msg;
-        return Object.assign({}, msg, { status: "failed" });
+        return msg.id === tempId ? Object.assign({}, msg, { status: "failed" }) : msg;
       });
       renderMsgs(roomId);
     } finally {
@@ -610,26 +552,26 @@
     }
   }
 
-  /* ══════════════════════════════════
-     Open chat from search result
-     ══════════════════════════════════ */
+  // ── Open chat from search result (Bug 1 fix) ───────────────────
   window.openChatFromSearch = async function (userObj) {
     try {
       if (!userObj || !userObj.userId) return;
-
       var sess = getSession();
       if (!sess || !sess.token) return;
 
       var open   = await window.VibeAPI.openOrCreateChat(userObj.userId, sess.token);
       var roomId = open.roomId || open.chatId || (open.chat && open.chat._id);
 
+      if (!roomId) throw new Error("Could not open chat");
+
       await refreshDMList();
 
       var meta = chatMeta[roomId] || {
         roomId:     roomId,
         userId:     userObj.userId,
-        username:   userObj.username || userObj.name,
-        name:       userObj.name     || userObj.username,
+        username:   userObj.username || userObj.name || "",
+        name:       userObj.name     || userObj.username || "",  // FIX: name included
+        uid:        userObj.uid      || "",
         avatar:     userObj.avatar   || "",
         bio:        userObj.bio      || "",
         isOnline:   !!userObj.isOnline,
@@ -637,6 +579,7 @@
       };
 
       openChatPage(meta, roomId);
+
       if (window.switchTab) window.switchTab("dm");
 
     } catch (e) {
@@ -644,28 +587,26 @@
     }
   };
 
-  /* ══════════════════════════════════
-     Socket message handler
-     ══════════════════════════════════ */
+  // ── Socket message handler ──────────────────────────────────────
   function handleSocketMessage(msg) {
     var sess = getSession();
     if (!msg || !sess) return;
 
-    /* incoming message */
-    if (msg.type === "message" && msg.room) {
-      var senderId = String(msg.sender || "");
-      if (senderId === String(sess.userId)) return;   // own echo — ignore
+    // Incoming DM message
+    if (msg.type === "message") {
+      var roomId   = msg.roomId || msg.room;
+      var senderId = String(msg.sender && (msg.sender._id || msg.sender.id) || msg.sender || "");
+      if (!roomId) return;
+      if (senderId === String(sess.userId)) return; // own echo
 
-      if (!msgStore[msg.room]) msgStore[msg.room] = [];
-
-      var exists = msgStore[msg.room].some(function (m) {
+      if (!msgStore[roomId]) msgStore[roomId] = [];
+      var exists = msgStore[roomId].some(function (m) {
         return String(m.id) === String(msg._id || "");
       });
-
       if (!exists) {
-        msgStore[msg.room].push({
+        msgStore[roomId].push({
           id:        String(msg._id || Date.now()),
-          text:      msg.text || msg.content || "",
+          text:      msg.content || msg.text || "",
           isMe:      false,
           time:      formatTime(msg.createdAt) || nowTime(),
           status:    "sent",
@@ -673,92 +614,77 @@
         });
       }
 
-      if (chatMeta[msg.room]) {
-        chatMeta[msg.room].preview = msg.text || msg.content || "";
-        chatMeta[msg.room].time   = msg.createdAt || new Date().toISOString();
-      }
-
-      // Feature 3: move to top
       updateChatListItem(
-        msg.room,
-        chatMeta[msg.room] || {},
-        msg.text || msg.content || "",
+        roomId,
+        chatMeta[roomId] || {},
+        msg.content || msg.text || "",
         msg.createdAt || new Date().toISOString()
       );
 
-      if (currentRoomId === msg.room) {
-        renderMsgs(msg.room);
-        markSeen(msg.room);
+      if (currentRoomId === roomId) {
+        renderMsgs(roomId);
+        markSeen(roomId);
       }
-
       refreshDMList();
     }
 
-    /* seen event */
+    // Message status update
+    if (msg.type === "status" && msg.msgId) {
+      Object.keys(msgStore).forEach(function (roomId) {
+        msgStore[roomId] = msgStore[roomId].map(function (m) {
+          return String(m.id) === String(msg.msgId)
+            ? Object.assign({}, m, { status: msg.status })
+            : m;
+        });
+      });
+      if (currentRoomId) renderMsgs(currentRoomId);
+    }
+
+    // Seen / blue ticks
     if (msg.type === "seen" && msg.room) {
       if (msgStore[msg.room]) {
         msgStore[msg.room] = msgStore[msg.room].map(function (m) {
-          return m.isMe ? Object.assign({}, m, { status: "seen" }) : m;
+          return m.isMe ? Object.assign({}, m, { status: "read" }) : m;
         });
       }
       if (currentRoomId === msg.room) renderMsgs(msg.room);
       refreshDMList();
     }
 
-    /* presence / online-offline */
+    // Presence / online-offline
     if (msg.type === "presence" && msg.userId) {
       Object.keys(chatMeta).forEach(function (roomId) {
         if (String(chatMeta[roomId].userId) === String(msg.userId)) {
-          chatMeta[roomId].isOnline  = !!msg.isOnline;
+          chatMeta[roomId].isOnline   = !!msg.isOnline;
           chatMeta[roomId].lastSeenAt = msg.lastSeen || null;
         }
       });
-
       if (currentRoomId &&
           chatMeta[currentRoomId] &&
           String(chatMeta[currentRoomId].userId) === String(msg.userId)) {
         currentChatUser = chatMeta[currentRoomId];
         renderUserStatus(currentChatUser);
       }
-
       refreshDMList();
     }
   }
 
-  /* ══════════════════════════════════
-     profile:updated event — refresh UI
-     ══════════════════════════════════ */
+  // ── profile:updated event ────────────────────────────────────────
   document.addEventListener("profile:updated", function (e) {
     var updated = (e && e.detail) || {};
     var sess    = getSession() || {};
-
-    if (updated.name)                     sess.name     = updated.name;
-    if (updated.username)                 sess.username = updated.username;
-    if (typeof updated.bio    === "string") sess.bio    = updated.bio;
-    if (typeof updated.avatar === "string") sess.avatar = updated.avatar;
-
+    if (updated.name)                       sess.name     = updated.name;
+    if (updated.username)                   sess.username = updated.username;
+    if (typeof updated.bio    === "string") sess.bio      = updated.bio;
+    if (typeof updated.avatar === "string") sess.avatar   = updated.avatar;
     saveSessionSafe(sess);
     renderProfile(sess);
   });
 
-  /* ══════════════════════════════════
-     DOMContentLoaded — boot
-     ══════════════════════════════════ */
+  // ── DOMContentLoaded boot ────────────────────────────────────────
   document.addEventListener("DOMContentLoaded", async function () {
     var sess = getSession();
-
-    // Extra fallback — try direct localStorage read if VibeState returns null
-    if (!sess) {
-      try {
-        var raw = localStorage.getItem("vibe_session_v1");
-        if (raw) {
-          var parsed = JSON.parse(raw);
-          if (parsed && parsed.token) sess = parsed;
-        }
-      } catch(e) {}
-    }
-
-    if (!sess || !sess.token) {
+    if (!sess || !sess.token || !sess.userId) {
       window.location.replace("./index.html");
       return;
     }
@@ -766,23 +692,19 @@
     renderProfile(sess);
     await refreshDMList();
 
-    // Feature 4: Settings — ensure openSettings() is available (defined in overlays.js)
-    // Feature 1-8: profile.js handles profile editor
-
     try {
       if (window.VibeSocket && typeof window.VibeSocket.connect === "function") {
         window.VibeSocket.connect(sess.token, handleSocketMessage);
       }
     } catch (e) {
-      console.error("[Socket]", e);
+      console.error("[Socket init error]", e);
     }
 
-    // Feature 9: Refresh "last seen" text every minute
+    // Refresh last seen text every minute
     setInterval(function () {
       if (currentRoomId && currentChatUser) {
         renderUserStatus(currentChatUser);
       }
     }, 60000);
   });
-
 })();
